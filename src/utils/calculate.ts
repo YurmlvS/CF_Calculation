@@ -26,7 +26,7 @@ export function calculate(
   // a = arctan(n/m)
   const a_rad = Math.atan(numN / numM);
   const a_deg = (a_rad * 180 / Math.PI).toFixed(0);
-  const sin_a = Math.sin(a_rad);
+  const sin_a = Math.sin(Number(a_deg) * Math.PI / 180);
 
   // 回转半径 i (单位: cm)
   const i_val = Math.sqrt(Number(I) / Number(A));
