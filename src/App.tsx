@@ -53,10 +53,10 @@ export default function App() {
   // --- 处理输入变化 ---
   const handleInputChange =
     (key: keyof CalcParams) =>
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const val = e.target.value;
-      setParams((prev) => ({ ...prev, [key]: val === '' ? '' : Number(val) }));
-    };
+      (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setParams((prev) => ({ ...prev, [key]: val === '' ? '' : Number(val) }));
+      };
 
   return (
     <div
@@ -79,8 +79,10 @@ export default function App() {
         {/* ── 列 2：参数输入区（居中，固定约 1/5 宽度） ── */}
         <div
           className="bg-gray-50 flex flex-col relative overflow-y-auto"
-          style={{ width: '20%', minWidth: '200px', scrollbarWidth: 'none',
-                   borderLeft: '1px solid #e5e7eb', borderRight: '1px solid #e5e7eb' }}
+          style={{
+            width: '23%', minWidth: '200px', scrollbarWidth: 'none',
+            borderLeft: '1px solid #e5e7eb', borderRight: '1px solid #e5e7eb'
+          }}
         >
           <div className="p-5 flex flex-col gap-5 w-full">
             <ParamsPanel

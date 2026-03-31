@@ -107,7 +107,7 @@ const ResultPanel: React.FC<ResultPanelProps> = ({ params, calcResult, calcTarge
           </button>
           <button
             id="btn-export-pdf"
-            onClick={() => exportToPDF(calcResult)}
+            onClick={() => void exportToPDF(calcResult)}
             style={{
               display: 'flex', alignItems: 'center', gap: '0.25rem',
               backgroundColor: '#1e293b', color: '#fff',

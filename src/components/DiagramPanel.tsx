@@ -1,11 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import { CalcParams } from '../types';
-
 interface DiagramPanelProps {
   params: CalcParams;
   isKonvaLoaded: boolean;
 }
-
 /**
  * 左侧 Konva.js 动态绘图区（Y撑支护示意图）
  */
@@ -14,10 +12,8 @@ const DiagramPanel: React.FC<DiagramPanelProps> = ({ params, isKonvaLoaded }) =>
   const stageRef = useRef<any>(null);
   const layerRef = useRef<any>(null);
   const shapeGroupRef = useRef<any>(null);
-
   useEffect(() => {
     if (!konvaContainerRef.current || !window.Konva) return;
-
     // 初始化 Stage
     if (!stageRef.current) {
       const container = konvaContainerRef.current;
@@ -30,7 +26,6 @@ const DiagramPanel: React.FC<DiagramPanelProps> = ({ params, isKonvaLoaded }) =>
       shapeGroupRef.current = new window.Konva.Group();
       layerRef.current.add(shapeGroupRef.current);
       stageRef.current.add(layerRef.current);
-
       window.addEventListener('resize', () => {
         if (stageRef.current && container) {
           stageRef.current.width(container.offsetWidth);
@@ -39,27 +34,21 @@ const DiagramPanel: React.FC<DiagramPanelProps> = ({ params, isKonvaLoaded }) =>
         }
       });
     }
-
     const drawOrUpdateGraphics = () => {
       // 参数未输入时采用预设值，保证画板不为空白
       const drawN = params.n === '' ? 4800 : Number(params.n);
       const drawM = params.m === '' ? 2144 : Number(params.m);
-
       const W = stageRef.current.width();
       const H = stageRef.current.height();
-      const padding = 120;
+      const padding = 140;
       const availW = W - padding * 2;
       const availH = H - padding * 2;
-
       const scale = Math.min(availW / drawM, availH / drawN);
       const scaledN = drawN * scale;
       const scaledM = drawM * scale;
-
       const cx = W / 2 - scaledM / 2;
       const cy = H / 2 - scaledN / 2;
-
       const group = shapeGroupRef.current;
-
       // 首次绘制所有形状
       if (group.getChildren().length === 0) {
         const wall = new window.Konva.Line({
@@ -88,7 +77,6 @@ const DiagramPanel: React.FC<DiagramPanelProps> = ({ params, isKonvaLoaded }) =>
         const labelBrace = new window.Konva.Text({ id: 'labelBrace', text: 'Y撑', fontSize: 16, fill: '#1d4ed8', fontStyle: 'bold' });
         group.add(wall, slab, brace, dimLineN, tickN1, tickN2, dimLineM, tickM1, tickM2, labelN, labelM, labelBrace);
       }
-
       // 动画更新各形状位置
       const ease = window.Konva.Easings.EaseInOut;
       new window.Konva.Tween({ node: group.findOne('#wall'), duration: 0.4, points: [cx, cy - 40, cx, cy + scaledN + 40], easing: ease }).play();
@@ -104,10 +92,8 @@ const DiagramPanel: React.FC<DiagramPanelProps> = ({ params, isKonvaLoaded }) =>
       new window.Konva.Tween({ node: group.findOne('#labelM'), duration: 0.4, x: cx + scaledM / 2 - 10, y: cy - 55 }).play();
       new window.Konva.Tween({ node: group.findOne('#labelBrace'), duration: 0.4, x: cx + scaledM / 2 + 10, y: cy + scaledN / 2 + 10 }).play();
     };
-
     drawOrUpdateGraphics();
   }, [params.n, params.m, isKonvaLoaded]);
-
   return (
     // ── 列 1：绘图区，固定 1/3 宽度，位于最左侧 ──
     <div
@@ -120,12 +106,28 @@ const DiagramPanel: React.FC<DiagramPanelProps> = ({ params, isKonvaLoaded }) =>
         backgroundColor: '#f8fafc',
       }}
     >
-      <div className="absolute top-4 left-4 bg-white/80 backdrop-blur px-3 py-1 rounded shadow text-sm font-semibold text-gray-600 z-10 border border-gray-200">
+      {/* ── 标题 bar（在普通文档流中，不遮挡 canvas）── */}
+      <div
+        style={{
+          flexShrink: 0,
+          padding: '0.5rem 1rem',
+          backgroundColor: 'rgba(255,255,255,0.85)',
+          backdropFilter: 'blur(4px)',
+          borderBottom: '1px solid #e5e7eb',
+          fontSize: '0.875rem',
+          fontWeight: 600,
+          color: '#4b5563',
+          zIndex: 10,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}
+      >
         Y撑支护示意图 (Y-Brace Support Diagram)
       </div>
-      <div ref={konvaContainerRef} className="flex-1 w-full h-full cursor-crosshair" />
+      {/* ── Konva 画布区域（填满剩余高度）── */}
+      <div ref={konvaContainerRef} className="flex-1 w-full cursor-crosshair" style={{ minHeight: 0 }} />
     </div>
   );
 };
-
 export default DiagramPanel;
