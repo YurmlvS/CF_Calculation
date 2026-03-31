@@ -31,7 +31,7 @@ const ResultPanel: React.FC<ResultPanelProps> = ({ params, calcResult, calcTarge
 
     if (!calcResult) {
       katexContainerRef.current.innerHTML =
-        '<div style="color:#9ca3af;font-size:0.875rem">请在左上方填入完整的参数以生成计算过程...</div>';
+        '<div style="color:#9ca3af;font-size:0.875rem">请填入完整的参数以生成计算过程...</div>';
       return;
     }
 

@@ -54,18 +54,24 @@ const DiagramPanel: React.FC<DiagramPanelProps> = ({ params, isKonvaLoaded }) =>
         const wall = new window.Konva.Line({
           id: 'wall',
           points: [cx, cy - 80, cx, cy + scaledN - 80],
-          stroke: '#4b5563', strokeWidth: 5, lineCap: 'square',
+          stroke: '#4b5563', strokeWidth: 3, lineCap: 'square',
+        });
+        const testline = new window.Konva.Line({
+          id: 'testline',
+          points: [cx + 40, cy, cx + scaledM / 2 - 40, cy + scaledN / 2],
+          stroke: '#4b5563', strokeWidth: 3, lineCap: 'square',
         });
         const slab = new window.Konva.Line({
           id: 'slab',
           points: [cx - 40, cy, cx + scaledM + 40, cy],
-          stroke: '#4b5563', strokeWidth: 5, lineCap: 'square',
+          stroke: '#4b5563', strokeWidth: 3, lineCap: 'square',
         });
         const brace = new window.Konva.Line({
           id: 'brace',
           points: [cx, cy + scaledN, cx + scaledM, cy],
-          stroke: '#2563eb', strokeWidth: 5, opacity: 0.8, lineCap: 'round',
+          stroke: '#4b5563', strokeWidth: 3, opacity: 0.8, lineCap: 'round',
         });
+        
         const dimLineN = new window.Konva.Line({ id: 'dimLineN', points: [cx - 30, cy, cx - 30, cy + scaledN], stroke: '#9ca3af', strokeWidth: 2 });
         const tickN1 = new window.Konva.Line({ id: 'tickN1', points: [cx - 35, cy, cx - 25, cy], stroke: '#9ca3af', strokeWidth: 2 });
         const tickN2 = new window.Konva.Line({ id: 'tickN2', points: [cx - 35, cy + scaledN, cx - 25, cy + scaledN], stroke: '#9ca3af', strokeWidth: 2 });
@@ -74,13 +80,14 @@ const DiagramPanel: React.FC<DiagramPanelProps> = ({ params, isKonvaLoaded }) =>
         const tickM2 = new window.Konva.Line({ id: 'tickM2', points: [cx + scaledM, cy - 35, cx + scaledM, cy - 25], stroke: '#9ca3af', strokeWidth: 2 });
         const labelN = new window.Konva.Text({ id: 'labelN', text: 'n', fontSize: 18, fill: '#374151', fontStyle: 'bold' });
         const labelM = new window.Konva.Text({ id: 'labelM', text: 'm', fontSize: 18, fill: '#374151', fontStyle: 'bold' });
-        const labelBrace = new window.Konva.Text({ id: 'labelBrace', text: 'Y撑', fontSize: 16, fill: '#1d4ed8', fontStyle: 'bold' });
-        group.add(wall, slab, brace, dimLineN, tickN1, tickN2, dimLineM, tickM1, tickM2, labelN, labelM, labelBrace);
+        const labelBrace = new window.Konva.Text({ id: 'labelBrace', text: '中点', fontSize: 18, fill: '#1d4ed8', fontStyle: 'bold' });
+        group.add(wall, testline, slab, brace, dimLineN, tickN1, tickN2, dimLineM, tickM1, tickM2, labelN, labelM, labelBrace);
       }
       // 动画更新各形状位置
       const ease = window.Konva.Easings.EaseInOut;
-      new window.Konva.Tween({ node: group.findOne('#wall'), duration: 0.4, points: [cx, cy - 40, cx, cy + scaledN + 40], easing: ease }).play();
-      new window.Konva.Tween({ node: group.findOne('#slab'), duration: 0.4, points: [cx - 40, cy, cx + scaledM + 40, cy], easing: ease }).play();
+      new window.Konva.Tween({ node: group.findOne('#testline'), duration: 0.4, points: [cx +40, cy, cx + scaledM /2, cy + scaledN /2], easing: ease }).play();
+      new window.Konva.Tween({ node: group.findOne('#wall'), duration: 0.4, points: [cx, cy - 0, cx, cy + scaledN + 40], easing: ease }).play();
+      new window.Konva.Tween({ node: group.findOne('#slab'), duration: 0.4, points: [cx - 0, cy, cx + scaledM + 40, cy], easing: ease }).play();
       new window.Konva.Tween({ node: group.findOne('#brace'), duration: 0.4, points: [cx, cy + scaledN, cx + scaledM, cy], easing: ease }).play();
       new window.Konva.Tween({ node: group.findOne('#dimLineN'), duration: 0.4, points: [cx - 30, cy, cx - 30, cy + scaledN], easing: ease }).play();
       new window.Konva.Tween({ node: group.findOne('#tickN1'), duration: 0.4, points: [cx - 35, cy, cx - 25, cy], easing: ease }).play();
@@ -107,22 +114,7 @@ const DiagramPanel: React.FC<DiagramPanelProps> = ({ params, isKonvaLoaded }) =>
       }}
     >
       {/* ── 标题 bar（在普通文档流中，不遮挡 canvas）── */}
-      <div
-        style={{
-          flexShrink: 0,
-          padding: '0.5rem 1rem',
-          backgroundColor: 'rgba(255,255,255,0.85)',
-          backdropFilter: 'blur(4px)',
-          borderBottom: '1px solid #e5e7eb',
-          fontSize: '0.875rem',
-          fontWeight: 600,
-          color: '#4b5563',
-          zIndex: 10,
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-        }}
-      >
+      <div className="absolute top-4 left-4 bg-white/80 backdrop-blur px-3 py-1 rounded shadow text-st font-semibold text-gray-800 z-10 border border-gray-200">
         Y撑支护示意图 (Y-Brace Support Diagram)
       </div>
       {/* ── Konva 画布区域（填满剩余高度）── */}
