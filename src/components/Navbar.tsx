@@ -25,12 +25,8 @@ const Navbar: React.FC = () => (
       </svg>
       <h1 className="text-xl font-bold tracking-wider">
         结构力学计算器{' '}
-        <span className="text-sm font-normal text-slate-300">
-          (Structural Mechanics)
-        </span>
       </h1>
     </div>
-    <div className="text-sm text-slate-400">工程辅助计算系统 v2.0</div>
   </nav>
 );
 
