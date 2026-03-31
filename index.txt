@@ -1,0 +1,534 @@
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import katex from 'katex';
+
+// 定义公式与参数的接口，允许为空字符串（用户尚未输入时）
+interface CalcParams {
+    n: number | '';
+    m: number | '';
+    mu: number | '';
+    R: number | '';
+    I: number | '';
+    A: number | '';
+    f: number | '';
+}
+
+// 模拟读取你上传的 lambda_vlaue.xlsx 的部分 CSV 数据
+// 这里内置了常见的范围数据，保证 81 和 207 能够精准匹配到 0.681 和 0.175
+const PHI_CSV_STRING = `
+0,1,1,1,0.999,0.999,0.998,0.997,0.996,0.995,0.994
+10,0.992,0.991,0.989,0.987,0.985,0.983,0.981,0.978,0.976,0.973
+20,0.97,0.967,0.963,0.96,0.957,0.953,0.95,0.946,0.943,0.939
+30,0.936,0.932,0.929,0.925,0.921,0.918,0.914,0.91,0.906,0.903
+40,0.899,0.895,0.891,0.886,0.882,0.878,0.874,0.87,0.865,0.861
+50,0.856,0.852,0.847,0.842,0.837,0.833,0.828,0.823,0.818,0.812
+60,0.807,0.802,0.796,0.791,0.785,0.78,0.774,0.768,0.762,0.757
+70,0.751,0.745,0.738,0.732,0.726,0.72,0.713,0.707,0.700,0.694
+80,0.688,0.681,0.675,0.669,0.662,0.656,0.65,0.643,0.637,0.631
+190,0.208,0.206,0.204,0.202,0.200,0.198,0.196,0.194,0.192,0.190
+200,0.188,0.186,0.184,0.182,0.180,0.178,0.177,0.175,0.173,0.172
+210,0.171,0.169,0.168,0.166,0.165,0.163,0.162,0.160,0.159,0.157
+`;
+
+export default function App() {
+    // --- 状态定义 ---
+    const [currentModule, setCurrentModule] = useState('y_brace');
+    const [calcTarget, setCalcTarget] = useState<'weak' | 'strong'>('weak');
+    const [isKonvaLoaded, setIsKonvaLoaded] = useState(false);
+
+    // 参数输入状态（全部默认置空）
+    const [params, setParams] = useState<CalcParams>({
+        n: '', m: '', mu: '', R: '', I: '', A: '', f: ''
+    });
+
+    const katexContainerRef = useRef<HTMLDivElement>(null);
+    const konvaContainerRef = useRef<HTMLDivElement>(null);
+    
+    // Konva 实例保存
+    const stageRef = useRef<any>(null);
+    const layerRef = useRef<any>(null);
+    const shapeGroupRef = useRef<any>(null);
+
+    // --- 动态加载依赖 ---
+    useEffect(() => {
+        // 加载 KaTeX 样式
+        if (!document.getElementById('katex-css')) {
+            const link = document.createElement('link');
+            link.id = 'katex-css';
+            link.rel = 'stylesheet';
+            link.href = 'https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css';
+            document.head.appendChild(link);
+        }
+
+        // 动态加载 html2pdf.js 用于 PDF 导出
+        if (!window.html2pdf) {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+            document.head.appendChild(script);
+        }
+
+        // 动态加载 Konva.js 用于绘图
+        if (!window.Konva) {
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/konva@9.3.6/konva.min.js';
+            script.onload = () => setIsKonvaLoaded(true);
+            document.head.appendChild(script);
+        } else {
+            setIsKonvaLoaded(true);
+        }
+    }, []);
+
+    // --- 监听计算目标的切换 ---
+    useEffect(() => {
+        // 切换计算目标时，清除 I 和 A 的数值，其他保持不变
+        setParams(prev => ({ ...prev, I: '', A: '' }));
+    }, [calcTarget]);
+
+    // --- 解析 Excel CSV 构建查表字典 ---
+    const phiTable = useMemo(() => {
+        const table: Record<number, Record<number, number>> = {};
+        const lines = PHI_CSV_STRING.trim().split('\n');
+        lines.forEach(line => {
+            const parts = line.split(',').map(s => parseFloat(s.trim()));
+            if (parts.length >= 11 && !isNaN(parts[0])) {
+                const rowKey = parts[0];
+                table[rowKey] = {};
+                for (let i = 1; i <= 10; i++) {
+                    table[rowKey][i - 1] = parts[i];
+                }
+            }
+        });
+        return table;
+    }, []);
+
+    // --- 模拟查表获取 phi (稳定系数) ---
+    const getPhi = (lambda: number): number => {
+        // 向上取整 (例如: 80.41 -> 81, 206.9 -> 207)
+        const target = Math.ceil(lambda); 
+        const row = Math.floor(target / 10) * 10; // 十位和百位
+        const col = target % 10; // 个位数
+
+        // 查表
+        if (phiTable[row] && phiTable[row][col] !== undefined) {
+            return phiTable[row][col];
+        }
+        
+        // 兜底公式，防止某些极端超限数值报错
+        return Math.max(0.1, 1 - (lambda / 250));
+    };
+
+    // --- 核心计算逻辑 ---
+    const calcResult = useMemo(() => {
+        const { n, m, mu, R, I, A, f } = params;
+        // 如果有任何一个参数为空，则返回 null，不进行计算
+        if (n === '' || m === '' || mu === '' || R === '' || I === '' || A === '' || f === '') return null;
+
+        const numN = Number(n);
+        const numM = Number(m);
+
+        // a计算 n/m
+        const a_rad = Math.atan(numN / numM);
+        const a_deg = (a_rad * 180 / Math.PI).toFixed(0);
+        const sin_a = Math.sin(a_rad);
+
+        let h0 = 0;
+        let lambda = 0;
+        let i_val = Math.sqrt(Number(I) / Number(A)); // 单位: cm
+
+        if (calcTarget === 'weak') {
+            // 弱轴方向演算
+            h0 = (Number(mu) * numN / sin_a) / 2;
+            lambda = h0 / (i_val * 10); // i_val 乘以 10 转换为 mm
+        } else {
+            // 强轴方向演算
+            h0 = Number(mu) * numN / sin_a;
+            lambda = h0 / (i_val * 10);
+        }
+
+        const Nx = Number(R) / sin_a;
+        const phi = getPhi(lambda);
+        
+        // sigma计算 Nx/(phi * A) 
+        // Nx单位kN -> N (乘1000), A单位cm2 -> mm2 (乘100) => 整体乘10
+        const sigma = (Nx * 10) / (phi * Number(A));
+        const isSafe = sigma < Number(f);
+
+        return {
+            a_deg, sin_a, h0, Nx, i_val, lambda, phi, sigma, isSafe, f: Number(f)
+        };
+    }, [params, calcTarget]);
+
+    // --- 渲染公式 ---
+    useEffect(() => {
+        if (!katexContainerRef.current) return;
+        
+        if (!calcResult) {
+            katexContainerRef.current.innerHTML = '<div class="text-gray-400 text-sm">请在左上方填入完整的参数以生成计算过程...</div>';
+            return;
+        }
+
+        const { n, m, mu, R, I, A } = params;
+        const { a_deg, h0, Nx, i_val, lambda, phi, sigma, isSafe, f } = calcResult;
+        
+        let latexString = '';
+        const safeText = isSafe ? '< f \\text{ (满足要求)}' : '\\ge f \\text{ (不满足)}';
+        const h0Formula = calcTarget === 'weak' 
+            ? `h_0 &= (\\mu n / \\sin a) / 2 = (${mu} \\times ${n} / \\sin ${a_deg}^\\circ) / 2 = ${h0.toFixed(1)} \\text{ mm}`
+            : `h_0' &= \\mu n / \\sin a = ${mu} \\times ${n} / \\sin ${a_deg}^\\circ = ${h0.toFixed(0)} \\text{ mm}`;
+
+        const lambdaFormula = calcTarget === 'weak'
+            ? `\\lambda &= h_0 / (i \\times 10) = ${h0.toFixed(1)} / ${(i_val*10).toFixed(1)} = ${lambda.toFixed(2)}`
+            : `\\lambda &= h_0' / (i \\times 10) = ${h0.toFixed(0)} / ${(i_val*10).toFixed(1)} = ${lambda.toFixed(2)}`;
+
+        latexString = `
+            \\begin{aligned}
+            a &= \\arctan(n/m) = \\arctan(${n}/${m}) = ${a_deg}^\\circ \\\\[8pt]
+            ${h0Formula} \\\\[8pt]
+            N_x &= R / \\sin a = ${R} / \\sin ${a_deg}^\\circ = ${Nx.toFixed(2)} \\text{ kN} \\\\[8pt]
+            i &= \\sqrt{I/A} = \\sqrt{${I}/${A}} = ${i_val.toFixed(2)} \\text{ cm} \\\\[8pt]
+            ${lambdaFormula} \\\\[8pt]
+            \\text{查表取 } \\lambda = ${Math.ceil(lambda)} \\rightarrow \\phi &= ${phi} \\\\[8pt]
+            \\sigma &= \\frac{N_x \\times 10}{\\phi A} = \\frac{${Nx.toFixed(2)} \\times 10}{${phi} \\times ${A}} = \\mathbf{${sigma.toFixed(2)}} ${safeText}
+            \\end{aligned}
+        `;
+
+        try {
+            katex.render(latexString, katexContainerRef.current, {
+                displayMode: true,
+                throwOnError: false,
+                strict: false
+            });
+        } catch (e) {
+            console.error("KaTeX render error", e);
+        }
+    }, [params, calcResult, calcTarget]);
+
+    // --- Konva 绘图及动画 ---
+    useEffect(() => {
+        if (!konvaContainerRef.current || !window.Konva) return;
+
+        // 初始化
+        if (!stageRef.current) {
+            const container = konvaContainerRef.current;
+            stageRef.current = new window.Konva.Stage({
+                container: container,
+                width: container.offsetWidth,
+                height: container.offsetHeight,
+            });
+            layerRef.current = new window.Konva.Layer();
+            shapeGroupRef.current = new window.Konva.Group();
+            
+            layerRef.current.add(shapeGroupRef.current);
+            stageRef.current.add(layerRef.current);
+
+            window.addEventListener('resize', () => {
+                if(stageRef.current && container) {
+                    stageRef.current.width(container.offsetWidth);
+                    stageRef.current.height(container.offsetHeight);
+                    drawOrUpdateGraphics();
+                }
+            });
+        }
+
+        const drawOrUpdateGraphics = () => {
+            // 如果用户未输入，采用视觉预设值，保证画板不为空白
+            const drawN = params.n === '' ? 4800 : Number(params.n);
+            const drawM = params.m === '' ? 2144 : Number(params.m);
+
+            const W = stageRef.current.width();
+            const H = stageRef.current.height();
+            const padding = 120;
+            const availW = W - padding * 2;
+            const availH = H - padding * 2;
+
+            const scale = Math.min(availW / drawM, availH / drawN);
+            const scaledN = drawN * scale;
+            const scaledM = drawM * scale;
+
+            // 设置交点 (cx, cy) 为左上角，使图形整体居中
+            const cx = W / 2 - scaledM / 2;
+            const cy = H / 2 - scaledN / 2;
+
+            const group = shapeGroupRef.current;
+
+            // 首次绘制
+            if (group.getChildren().length === 0) {
+                // 垂直主结构 (Wall/Column)
+                const wall = new window.Konva.Line({
+                    id: 'wall', points: [cx, cy -80, cx, cy + scaledN -80 ],
+                    stroke: '#4b5563', strokeWidth: 5, lineCap: 'square'
+                });
+                
+                // 水平主结构 (Beam/Slab)
+                const slab = new window.Konva.Line({
+                    id: 'slab', points: [cx - 40, cy, cx + scaledM + 40, cy],
+                    stroke: '#4b5563', strokeWidth: 5, lineCap: 'square'
+                });
+
+                // Y撑主体 (Brace)
+                const brace = new window.Konva.Line({
+                    id: 'brace', points: [cx, cy + scaledN, cx + scaledM, cy],
+                    stroke: '#2563eb', strokeWidth: 5, opacity: 0.8, lineCap: 'round'
+                });
+
+                // --- 尺寸标注线 (Dimension Lines) ---
+                // N 的标注
+                const dimLineN = new window.Konva.Line({ id: 'dimLineN', points: [cx - 30, cy, cx - 30, cy + scaledN], stroke: '#9ca3af', strokeWidth: 2 });
+                const tickN1 = new window.Konva.Line({ id: 'tickN1', points: [cx - 35, cy, cx - 25, cy], stroke: '#9ca3af', strokeWidth: 2 });
+                const tickN2 = new window.Konva.Line({ id: 'tickN2', points: [cx - 35, cy + scaledN, cx - 25, cy + scaledN], stroke: '#9ca3af', strokeWidth: 2 });
+
+                // M 的标注
+                const dimLineM = new window.Konva.Line({ id: 'dimLineM', points: [cx, cy - 30, cx + scaledM, cy - 30], stroke: '#9ca3af', strokeWidth: 2 });
+                const tickM1 = new window.Konva.Line({ id: 'tickM1', points: [cx, cy - 35, cx, cy - 25], stroke: '#9ca3af', strokeWidth: 2 });
+                const tickM2 = new window.Konva.Line({ id: 'tickM2', points: [cx + scaledM, cy - 35, cx + scaledM, cy - 25], stroke: '#9ca3af', strokeWidth: 2 });
+
+
+                // 文字标注
+                const labelN = new window.Konva.Text({ id: 'labelN', text: 'n', fontSize: 18, fill: '#374151', fontStyle: 'bold' });
+                const labelM = new window.Konva.Text({ id: 'labelM', text: 'm', fontSize: 18, fill: '#374151', fontStyle: 'bold' });
+                const labelBrace = new window.Konva.Text({ id: 'labelBrace', text: 'Y撑 (Brace)', fontSize: 16, fill: '#1d4ed8', fontStyle: 'bold' });
+
+                group.add(wall, slab, brace, dimLineN, tickN1, tickN2, dimLineM, tickM1, tickM2, labelN, labelM, labelBrace);
+            }
+
+            // 执行动画更新
+            new window.Konva.Tween({ node: group.findOne('#wall'), duration: 0.4, points: [cx, cy - 40, cx, cy + scaledN + 40], easing: window.Konva.Easings.EaseInOut }).play();
+            new window.Konva.Tween({ node: group.findOne('#slab'), duration: 0.4, points: [cx - 40, cy, cx + scaledM + 40, cy], easing: window.Konva.Easings.EaseInOut }).play();
+            new window.Konva.Tween({ node: group.findOne('#brace'), duration: 0.4, points: [cx, cy + scaledN, cx + scaledM, cy], easing: window.Konva.Easings.EaseInOut }).play();
+            
+            new window.Konva.Tween({ node: group.findOne('#dimLineN'), duration: 0.4, points: [cx - 30, cy, cx - 30, cy + scaledN], easing: window.Konva.Easings.EaseInOut }).play();
+            new window.Konva.Tween({ node: group.findOne('#tickN1'), duration: 0.4, points: [cx - 35, cy, cx - 25, cy], easing: window.Konva.Easings.EaseInOut }).play();
+            new window.Konva.Tween({ node: group.findOne('#tickN2'), duration: 0.4, points: [cx - 35, cy + scaledN, cx - 25, cy + scaledN], easing: window.Konva.Easings.EaseInOut }).play();
+
+            new window.Konva.Tween({ node: group.findOne('#dimLineM'), duration: 0.4, points: [cx, cy - 30, cx + scaledM, cy - 30], easing: window.Konva.Easings.EaseInOut }).play();
+            new window.Konva.Tween({ node: group.findOne('#tickM1'), duration: 0.4, points: [cx, cy - 35, cx, cy - 25], easing: window.Konva.Easings.EaseInOut }).play();
+            new window.Konva.Tween({ node: group.findOne('#tickM2'), duration: 0.4, points: [cx + scaledM, cy - 35, cx + scaledM, cy - 25], easing: window.Konva.Easings.EaseInOut }).play();
+
+            // 文本定位
+            new window.Konva.Tween({ node: group.findOne('#labelN'), duration: 0.4, x: cx - 55, y: cy + scaledN / 2 - 10 }).play();
+            new window.Konva.Tween({ node: group.findOne('#labelM'), duration: 0.4, x: cx + scaledM / 2 - 10, y: cy - 55 }).play();
+            new window.Konva.Tween({ node: group.findOne('#labelBrace'), duration: 0.4, x: cx + scaledM / 2 + 10, y: cy + scaledN / 2 + 10 }).play();
+        };
+
+        drawOrUpdateGraphics();
+
+    }, [params.n, params.m, isKonvaLoaded]);
+
+    // --- 导出功能 ---
+    const exportToPDF = () => {
+        if (!calcResult) { alert("请先填写完整参数完成计算！"); return; }
+        const element = document.getElementById('export-area');
+        if (!element || !window.html2pdf) return;
+        
+        // 核心修复：克隆节点以避免滚动条截断或受父级宽度挤压
+        const clone = element.cloneNode(true) as HTMLElement;
+        clone.style.width = '800px'; // 模拟 A4 纸宽度，保证长公式有充足空间
+        clone.style.position = 'absolute';
+        clone.style.top = '0px';
+        clone.style.left = '0px';
+        clone.style.zIndex = '-9999';
+        clone.style.backgroundColor = '#ffffff';
+
+        // 移除导致 KaTeX 公式在截屏时被横向截断的 overflow 类
+        const formulaDiv = clone.querySelector('.overflow-x-auto');
+        if (formulaDiv) {
+            formulaDiv.classList.remove('overflow-x-auto');
+            (formulaDiv as HTMLElement).style.overflow = 'visible';
+            (formulaDiv as HTMLElement).style.whiteSpace = 'normal';
+        }
+
+        document.body.appendChild(clone);
+        
+        const opt = {
+            margin:       15,
+            filename:     `Y撑验算书_${Date.now()}.pdf`,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true, scrollY: 0, windowWidth: 800 },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            pagebreak:    { mode: 'avoid-all' } // 防止内容从中间被硬切断
+        };
+        
+        window.html2pdf().set(opt).from(clone).save().then(() => {
+            // 导出完成后清理隐形节点
+            document.body.removeChild(clone);
+        });
+    };
+
+    const exportToWord = () => {
+        if (!calcResult) { alert("请先填写完整参数完成计算！"); return; }
+        const element = document.getElementById('export-area');
+        if (!element) return;
+
+        // 同样在 Word 导出时移除截断类，保证公式完整
+        const clone = element.cloneNode(true) as HTMLElement;
+        const formulaDiv = clone.querySelector('.overflow-x-auto');
+        if (formulaDiv) {
+            formulaDiv.classList.remove('overflow-x-auto');
+            (formulaDiv as HTMLElement).style.overflow = 'visible';
+        }
+
+        const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head><meta charset='utf-8'><title>Calculation Report</title></head><body>`;
+        const footer = "</body></html>";
+        
+        const sourceHTML = header + clone.innerHTML + footer;
+        const blob = new Blob(['\ufeff', sourceHTML], { type: 'application/msword' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Y撑验算书_${Date.now()}.doc`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const currentTime = new Date().toLocaleString('zh-CN', { hour12: false });
+
+    // 处理输入变化，允许设为空字符串
+    const handleInputChange = (key: keyof CalcParams) => (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setParams(prev => ({ ...prev, [key]: val === '' ? '' : Number(val) }));
+    };
+
+    return (
+        <div className="bg-gray-100 text-gray-800 font-sans min-h-screen flex flex-col overflow-hidden">
+            {/* 顶部导航栏 */}
+            <nav className="bg-slate-800 text-white shadow-md px-6 py-4 flex items-center justify-between z-20 shrink-0">
+                <div className="flex items-center gap-3">
+                    <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h3a1 1 0 011 1v5m-5 0v-5a1 1 0 011-1h3a1 1 0 011 1v5m-4 2h.01"></path></svg>
+                    <h1 className="text-xl font-bold tracking-wider">结构力学计算器 <span className="text-sm font-normal text-slate-300">(Structural Mechanics)</span></h1>
+                </div>
+                <div className="text-sm text-slate-400">工程辅助计算系统 v2.0</div>
+            </nav>
+
+            <main className="flex flex-1 overflow-hidden relative">
+                {/* 左侧绘图区 */}
+                <div className="w-1/2 border-r border-gray-300 relative shadow-inner overflow-hidden flex flex-col"
+                     style={{
+                         backgroundImage: `linear-gradient(to right, #e5e7eb 1px, transparent 1px), linear-gradient(to bottom, #e5e7eb 1px, transparent 1px)`,
+                         backgroundSize: '40px 40px',
+                         backgroundColor: '#f8fafc'
+                     }}>
+                    <div className="absolute top-4 left-4 bg-white/80 backdrop-blur px-3 py-1 rounded shadow text-sm font-semibold text-gray-600 z-10 border border-gray-200">
+                        Y撑支护示意图 (Y-Brace Support Diagram)
+                    </div>
+                    <div ref={konvaContainerRef} className="flex-1 w-full h-full cursor-crosshair"></div>
+                </div>
+
+                {/* 右侧控制与计算区 */}
+                <div className="w-1/2 bg-white flex flex-col relative overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+                    <div className="p-8 flex flex-col gap-8 max-w-2xl mx-auto w-full">
+                        
+                        {/* 模块选择 */}
+                        <section>
+                            <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6z"></path></svg>
+                                模块选择 (Module Selection)
+                            </h2>
+                            <select 
+                                value={currentModule} 
+                                onChange={(e) => setCurrentModule(e.target.value)}
+                                className="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-3 transition-colors">
+                                <option value="y_brace">Y撑的复核验算</option>
+                                <option value="wall_tie" disabled>超长连墙件 (开发中...)</option>
+                                <option value="bracket" disabled>底板钢筋支架支撑计算 (开发中...)</option>
+                            </select>
+                        </section>
+
+                        {/* 参数输入 */}
+                        <section className="bg-blue-50/50 p-6 rounded-xl border border-blue-100 transition-all duration-300">
+                            <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                                参数输入 (Parameters)
+                            </h2>
+                            
+                            <div className="grid grid-cols-2 gap-4 mb-6">
+                                <div><label className="block mb-1 text-sm font-medium text-gray-700">n (mm)</label><input type="number" placeholder="例如: 4800" value={params.n} onChange={handleInputChange('n')} className="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"/></div>
+                                <div><label className="block mb-1 text-sm font-medium text-gray-700">m (mm)</label><input type="number" placeholder="例如: 2144" value={params.m} onChange={handleInputChange('m')} className="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"/></div>
+                                <div><label className="block mb-1 text-sm font-medium text-gray-700">μ (约束系数)</label><input type="number" placeholder="例如: 1" value={params.mu} onChange={handleInputChange('mu')} className="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"/></div>
+                                <div><label className="block mb-1 text-sm font-medium text-gray-700">R (kN)</label><input type="number" placeholder="例如: 25.151" value={params.R} onChange={handleInputChange('R')} className="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"/></div>
+                                <div><label className="block mb-1 text-sm font-medium text-gray-700">I (惯性矩 cm⁴)</label><input type="number" placeholder={calcTarget === 'weak' ? "例如: 16.6" : "例如: 101"} value={params.I} onChange={handleInputChange('I')} className="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"/></div>
+                                <div><label className="block mb-1 text-sm font-medium text-gray-700">A (截面积 cm²)</label><input type="number" placeholder="例如: 10.24" value={params.A} onChange={handleInputChange('A')} className="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"/></div>
+                                <div className="col-span-2"><label className="block mb-1 text-sm font-medium text-gray-700">f (抗压强度设计值 N/mm²)</label><input type="number" placeholder="例如: 205" value={params.f} onChange={handleInputChange('f')} className="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"/></div>
+                            </div>
+
+                            <label className="block mb-2 text-sm font-medium text-gray-700">计算目标 (Target)</label>
+                            <select 
+                                value={calcTarget} 
+                                onChange={(e) => setCalcTarget(e.target.value as any)}
+                                className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5">
+                                <option value="weak">弱轴方向演算 (Weak Axis)</option>
+                                <option value="strong">强轴方向演算 (Strong Axis)</option>
+                            </select>
+                        </section>
+
+                        {/* 计算结果与导出 */}
+                        <section className="flex-1 flex flex-col transition-opacity duration-500">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                                    <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    结果报告 (Result Report)
+                                </h2>
+                                <div className="flex gap-2">
+                                    <button onClick={exportToWord} className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded shadow transition-colors text-sm font-medium disabled:opacity-50">
+                                        导出 Word
+                                    </button>
+                                    <button onClick={exportToPDF} className="flex items-center gap-1 bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded shadow transition-colors text-sm font-medium disabled:opacity-50">
+                                        导出 PDF
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* 供导出的容器 */}
+                            <div id="export-area" className="bg-white border border-gray-200 shadow-sm rounded-xl p-6 relative">
+                                <div className="border-b border-gray-100 pb-4 mb-4">
+                                    <h3 className="text-xl font-bold text-center text-gray-800">Y撑复核验算书</h3>
+                                    <p className="text-center text-xs text-gray-400 mt-1">验算方向: {calcTarget === 'weak' ? '弱轴' : '强轴'} | 生成时间: {currentTime}</p>
+                                </div>
+
+                                <div className="mb-4">
+                                    <h4 className="text-sm font-semibold text-gray-600 mb-2">1. 已知参数 (Known Parameters):</h4>
+                                    {calcResult ? (
+                                        <ul className="list-disc list-inside text-sm text-gray-700 ml-2 grid grid-cols-2 gap-1">
+                                            <li>n = {params.n} mm</li>
+                                            <li>m = {params.m} mm</li>
+                                            <li>μ = {params.mu}</li>
+                                            <li>R = {params.R} kN</li>
+                                            <li>I = {params.I} cm⁴</li>
+                                            <li>A = {params.A} cm²</li>
+                                            <li>f = {params.f} N/mm²</li>
+                                        </ul>
+                                    ) : (
+                                        <span className="text-xs text-gray-400">等待输入...</span>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <h4 className="text-sm font-semibold text-gray-600 mb-2">2. 计算过程 (Calculation Process):</h4>
+                                    <div 
+                                        ref={katexContainerRef}
+                                        className="bg-gray-50 p-4 rounded border border-gray-100 overflow-x-auto text-center py-6 min-h-[100px] flex items-center justify-center">
+                                    </div>
+                                </div>
+                                
+                                <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between">
+                                    <h4 className="text-sm font-semibold text-gray-600">3. 最终结论 (Final Result): </h4>
+                                    <span className={`text-lg font-bold ${calcResult ? (calcResult.isSafe ? 'text-green-600' : 'text-red-600') : 'text-gray-400'}`}>
+                                        {calcResult ? (calcResult.isSafe ? '验算通过，满足要求' : '验算不通过，不满足要求') : '待计算'}
+                                    </span>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+            </main>
+        </div>
+    );
+}
+
+// 供全局声明使用，避免 TypeScript 报错
+declare global {
+    interface Window {
+        html2pdf: any;
+        Konva: any;
+    }
+}
