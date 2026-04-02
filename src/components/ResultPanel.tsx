@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import katex from 'katex';
 import { CalcParams, CalcResult, CalcTarget } from '../types';
 import { exportToPDF, exportToWord } from '../utils/exportUtils';
@@ -8,6 +8,16 @@ interface ResultPanelProps {
   calcResult: CalcResult | null;
   calcTarget: CalcTarget;
 }
+
+// 安全渲染单个 KaTeX 公式的辅助函数（用于生成 Word 导出的单行公式）
+const safeRenderKatex = (tex: string) => {
+  try {
+    return katex.renderToString(tex, { displayMode: true, throwOnError: false });
+  } catch (e) {
+    console.error('KaTeX render error:', e);
+    return tex;
+  }
+};
 
 /**
  * 结果报告区域：KaTeX 公式渲染 + 参数列表 + 导出按钮
@@ -25,7 +35,7 @@ const ResultPanel: React.FC<ResultPanelProps> = ({ params, calcResult, calcTarge
     }
   }, []);
 
-  // 渲染 KaTeX 公式
+  // 1. 渲染网页 UI 用的一体化对齐 KaTeX 公式
   useEffect(() => {
     if (!katexContainerRef.current) return;
 
@@ -41,15 +51,16 @@ const ResultPanel: React.FC<ResultPanelProps> = ({ params, calcResult, calcTarge
     const safeText = isSafe
       ? '< f \\text{ (满足要求)}'
       : '\\ge f \\text{ (不满足)}';
-    const h0Formula =
-      calcTarget === 'weak'
+    
+    const h0Formula = calcTarget === 'weak'
         ? `h_0 &= (\\mu n / \\sin a) / 2 = (${mu} \\times ${n} / \\sin ${a_deg}^\\circ) / 2 = ${h0.toFixed(1)} \\text{ mm}`
         : `h_0' &= \\mu n / \\sin a = ${mu} \\times ${n} / \\sin ${a_deg}^\\circ = ${h0.toFixed(0)} \\text{ mm}`;
-    const lambdaFormula =
-      calcTarget === 'weak'
+    
+    const lambdaFormula = calcTarget === 'weak'
         ? `\\lambda &= h_0 / (i \\times 10) = ${h0.toFixed(1)} / ${(i_val * 10).toFixed(1)} = ${lambda.toFixed(2)}`
         : `\\lambda &= h_0' / (i \\times 10) = ${h0.toFixed(0)} / ${(i_val * 10).toFixed(1)} = ${lambda.toFixed(2)}`;
 
+    // 网页显示的连贯整体公式
     const latexString = `
       \\begin{aligned}
       a &= \\arctan(n/m) = \\arctan(${n}/${m}) = ${a_deg}^\\circ \\\\[8pt]
@@ -73,12 +84,44 @@ const ResultPanel: React.FC<ResultPanelProps> = ({ params, calcResult, calcTarge
     }
   }, [params, calcResult, calcTarget]);
 
+  // 2. 生成专供 Word 导出使用的分段结构 HTML 字符串
+  const wordExportHTMLs = useMemo(() => {
+    if (!calcResult) return null;
+    const { n, m, mu, R, I, A } = params;
+    const { a_deg, h0, Nx, i_val, lambda, phi, sigma, isSafe } = calcResult;
+
+    const safeText = isSafe ? '< f \\text{ (满足要求)}' : '\\ge f \\text{ (不满足)}';
+
+    // 独立公式（去除对齐符号 &，不再拼接为一个长块）
+    const eqAngle = `a = \\arctan(n/m) = \\arctan(${n}/${m}) = ${a_deg}^\\circ`;
+    const eqH0 = calcTarget === 'weak'
+      ? `h_0 = (\\mu n / \\sin a) / 2 = (${mu} \\times ${n} / \\sin ${a_deg}^\\circ) / 2 = ${h0.toFixed(1)} \\text{ mm}`
+      : `h_0' = \\mu n / \\sin a = ${mu} \\times ${n} / \\sin ${a_deg}^\\circ = ${h0.toFixed(0)} \\text{ mm}`;
+    const eqNx = `N_x = R / \\sin a = ${R} / \\sin ${a_deg}^\\circ = ${Nx.toFixed(2)} \\text{ kN}`;
+    const eqI = `i = \\sqrt{I/A} = \\sqrt{${I}/${A}} = ${i_val.toFixed(2)} \\text{ cm}`;
+    const eqLambda = calcTarget === 'weak'
+      ? `\\lambda = h_0 / (i \\times 10) = ${h0.toFixed(1)} / ${(i_val * 10).toFixed(1)} = ${lambda.toFixed(2)}`
+      : `\\lambda = h_0' / (i \\times 10) = ${h0.toFixed(0)} / ${(i_val * 10).toFixed(1)} = ${lambda.toFixed(2)}`;
+    const eqPhi = `\\text{查表取 } \\lambda = ${Math.ceil(lambda)} \\rightarrow \\phi = ${phi}`;
+    const eqSigma = `\\sigma = \\frac{N_x \\times 10}{\\phi A} = \\frac{${Nx.toFixed(2)} \\times 10}{${phi} \\times ${A}} = \\mathbf{${sigma.toFixed(2)}} ${safeText}`;
+
+    return {
+      eqAngle: safeRenderKatex(eqAngle),
+      eqH0: safeRenderKatex(eqH0),
+      eqNx: safeRenderKatex(eqNx),
+      eqI: safeRenderKatex(eqI),
+      eqLambda: safeRenderKatex(eqLambda),
+      eqPhi: safeRenderKatex(eqPhi),
+      eqSigma: safeRenderKatex(eqSigma),
+    };
+  }, [params, calcResult, calcTarget]);
+
   return (
     <section
       className="flex-1 flex flex-col transition-opacity duration-500"
       style={{ minWidth: 0 }}
     >
-      {/* ── 标题行 + 导出按钮（对齐 index.txt 原版） ── */}
+      {/* ── 标题行 + 导出按钮 ── */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
           <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -125,7 +168,7 @@ const ResultPanel: React.FC<ResultPanelProps> = ({ params, calcResult, calcTarge
         </div>
       </div>
 
-      {/* ── 供导出的报告容器（对齐 index.txt export-area 样式）── */}
+      {/* ── 供导出的报告容器 ── */}
       <div
         id="export-area"
         className="bg-white border border-gray-200 shadow-sm rounded-xl p-6 relative"
@@ -152,7 +195,7 @@ const ResultPanel: React.FC<ResultPanelProps> = ({ params, calcResult, calcTarge
               <li>n = {params.n} mm</li>
               <li>m = {params.m} mm</li>
               <li>μ = {params.mu}</li>
-              <li>R = {params.R} kN</li>
+              <li>R(下撑杆件支座力) = {params.R} kN</li>
               <li>I = {params.I} cm⁴</li>
               <li>A = {params.A} cm²</li>
               <li>f = {params.f} N/mm²</li>
@@ -167,10 +210,54 @@ const ResultPanel: React.FC<ResultPanelProps> = ({ params, calcResult, calcTarge
           <h4 className="text-sm font-semibold text-gray-600 mb-2">
             2. 计算过程 (Calculation Process):
           </h4>
-          <div
-            ref={katexContainerRef}
-            className="bg-gray-50 p-4 rounded border border-gray-100 overflow-x-auto text-center py-6 min-h-[100px] flex items-center justify-center"
-          />
+
+          {/* 模式 A：网页和 PDF 导出的连贯公式区（保留当前形态） */}
+          <div id="ui-calc-process">
+            <div
+              ref={katexContainerRef}
+              className="bg-gray-50 p-4 rounded border border-gray-100 overflow-x-auto text-center py-6 min-h-[100px] flex items-center justify-center"
+            />
+          </div>
+
+          {/* 模式 B：专供 Word 导出的分段区（预留文字位置，网页中不显示） */}
+          {calcResult && wordExportHTMLs && (
+            <div id="word-calc-process" style={{ display: 'none' }}>
+              
+              {/* === 在此调整您需要的文字内容 === */}
+              <p style={{ margin: '12px 0 4px 0', fontSize: '11pt', color: '#000000' }}>
+                下撑杆件角度计算： 
+              </p>
+              <div dangerouslySetInnerHTML={{ __html: wordExportHTMLs.eqAngle }} />
+
+              <p style={{ margin: '12px 0 4px 0', fontSize: '11pt', color: '#000000' }}>
+                下撑杆件弱轴方向计算长度计算：
+              </p>
+              <div dangerouslySetInnerHTML={{ __html: wordExportHTMLs.eqH0 }} />
+
+              <p style={{ margin: '12px 0 4px 0', fontSize: '11pt', color: '#000000' }}>
+                下撑杆件轴向力：
+              </p>
+              <div dangerouslySetInnerHTML={{ __html: wordExportHTMLs.eqNx }} />
+
+              <p style={{ margin: '12px 0 4px 0', fontSize: '11pt', color: '#000000' }}>
+                下撑杆长细比：
+              </p>
+              <div dangerouslySetInnerHTML={{ __html: wordExportHTMLs.eqI }} />
+              <div dangerouslySetInnerHTML={{ __html: wordExportHTMLs.eqLambda }} />
+
+              <p style={{ margin: '12px 0 4px 0', fontSize: '11pt', color: '#000000' }}>
+                查《钢结构设计标准》GB50017-2017表：
+              </p>
+              <div dangerouslySetInnerHTML={{ __html: wordExportHTMLs.eqPhi }} />
+
+              <p style={{ margin: '12px 0 4px 0', fontSize: '11pt', color: '#000000' }}>
+                轴心受压稳定性计算：
+              </p>
+              <div dangerouslySetInnerHTML={{ __html: wordExportHTMLs.eqSigma }} />
+              {/* ============================= */}
+
+            </div>
+          )}
         </div>
 
         {/* 3. 最终结论 */}

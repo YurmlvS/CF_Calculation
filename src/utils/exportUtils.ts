@@ -32,9 +32,9 @@ function ensureHtml2Pdf(): Promise<void> {
 /**
  * 导出 PDF
  * 修复要点：
- *  1. 操作原始 element，先把 overflow 约束临时去除，截图后还原
- *  2. 等 html2pdf 加载完毕再执行，避免 window.html2pdf 为 undefined
- *  3. html2canvas windowWidth 与 element 实际渲染宽度一致
+ * 1. 操作原始 element，先把 overflow 约束临时去除，截图后还原
+ * 2. 等 html2pdf 加载完毕再执行，避免 window.html2pdf 为 undefined
+ * 3. html2canvas windowWidth 与 element 实际渲染宽度一致
  */
 export async function exportToPDF(calcResult: CalcResult | null): Promise<void> {
   if (!calcResult) {
@@ -112,6 +112,21 @@ export function exportToWord(calcResult: CalcResult | null): void {
 
   // 克隆 DOM 用于 Word 输出（Word 导出不依赖截图，克隆安全）
   const clone = element.cloneNode(true) as HTMLElement;
+
+  // =========== 核心调整：处理 Word 导出的多段结构 ===========
+  // 1. 移除给网页和 PDF 使用的一体化计算块
+  const uiProcess = clone.querySelector('#ui-calc-process');
+  if (uiProcess && uiProcess.parentNode) {
+    uiProcess.parentNode.removeChild(uiProcess);
+  }
+
+  // 2. 将隐藏的带文字排版块，在 Word 克隆节点里展示出来
+  const wordProcess = clone.querySelector('#word-calc-process') as HTMLElement;
+  if (wordProcess) {
+    wordProcess.style.display = 'block';
+  }
+  // ========================================================
+
   const formulaDiv = clone.querySelector<HTMLElement>('.overflow-x-auto');
   if (formulaDiv) {
     formulaDiv.style.overflow = 'visible';
@@ -119,13 +134,16 @@ export function exportToWord(calcResult: CalcResult | null): void {
   }
 
   // 内嵌 KaTeX 字体样式链接，保证 Word 打开时样式尽量保留
+  // 增加了宋体的回退支持，更利于中文段落
   const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office'
     xmlns:w='urn:schemas-microsoft-com:office:word'
     xmlns='http://www.w3.org/TR/REC-html40'>
     <head>
       <meta charset='utf-8'>
       <title>Y撑复核验算书</title>
-      <style>body{font-family:Arial,sans-serif;font-size:11pt;}</style>
+      <style>
+        body{ font-family: 'SimSun', Arial, sans-serif; font-size:11pt; }
+      </style>
     </head><body>`;
   const footer = '</body></html>';
 
