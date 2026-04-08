@@ -536,10 +536,29 @@ body {
   background-color: rgba(239, 246, 255, 0.5);
 }
 
-/* ---- Scrollbar ---- */
+/* ---- Scrollbar: invisible but still scrollable ---- */
+/* WebKit (Chrome, Safari, Edge) */
 ::-webkit-scrollbar {
-  width: 0;
-  height: 0;
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.15);
+}
+/* Firefox: use scrollbar-width: thin + transparent colors */
+.overflow-y-auto {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.overflow-y-auto:hover {
+  scrollbar-color: rgba(0,0,0,0.12) transparent;
 }
 
 /* ---- Input base reset ---- */

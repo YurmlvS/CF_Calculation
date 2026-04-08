@@ -12,11 +12,16 @@ const DiagramPanel: React.FC<DiagramPanelProps> = ({ params, isKonvaLoaded }) =>
   const stageRef = useRef<any>(null);
   const layerRef = useRef<any>(null);
   const shapeGroupRef = useRef<any>(null);
+  // 将绘图函数存入 ref，使 ResizeObserver 回调始终调用最新版本
+  const drawFnRef = useRef<(() => void) | null>(null);
+  const observerRef = useRef<ResizeObserver | null>(null);
+
   useEffect(() => {
     if (!konvaContainerRef.current || !window.Konva) return;
-    // 初始化 Stage
+    const container = konvaContainerRef.current;
+
+    // 初始化 Stage（仅一次）
     if (!stageRef.current) {
-      const container = konvaContainerRef.current;
       stageRef.current = new window.Konva.Stage({
         container,
         width: container.offsetWidth,
@@ -26,14 +31,19 @@ const DiagramPanel: React.FC<DiagramPanelProps> = ({ params, isKonvaLoaded }) =>
       shapeGroupRef.current = new window.Konva.Group();
       layerRef.current.add(shapeGroupRef.current);
       stageRef.current.add(layerRef.current);
-      window.addEventListener('resize', () => {
+
+      // 使用 ResizeObserver 监听容器尺寸变化（包括窗口拉伸、flex 重排等）
+      observerRef.current = new ResizeObserver(() => {
         if (stageRef.current && container) {
           stageRef.current.width(container.offsetWidth);
           stageRef.current.height(container.offsetHeight);
-          drawOrUpdateGraphics();
+          // 通过 ref 调用最新的绘图函数，避免闭包过期
+          drawFnRef.current?.();
         }
       });
+      observerRef.current.observe(container);
     }
+
     const drawOrUpdateGraphics = () => {
       // 参数未输入时采用预设值，保证画板不为空白
       const drawN = params.n === '' ? 4800 : Number(params.n);
@@ -99,7 +109,15 @@ const DiagramPanel: React.FC<DiagramPanelProps> = ({ params, isKonvaLoaded }) =>
       new window.Konva.Tween({ node: group.findOne('#labelM'), duration: 0.4, x: cx + scaledM / 2 - 10, y: cy - 55 }).play();
       new window.Konva.Tween({ node: group.findOne('#labelBrace'), duration: 0.4, x: cx + scaledM / 2 + 10, y: cy + scaledN / 2 + 10 }).play();
     };
+
+    // 保存最新版本到 ref，供 ResizeObserver 回调使用
+    drawFnRef.current = drawOrUpdateGraphics;
     drawOrUpdateGraphics();
+
+    return () => {
+      // 组件卸载时断开 ResizeObserver
+      observerRef.current?.disconnect();
+    };
   }, [params.n, params.m, isKonvaLoaded]);
   return (
     // ── 列 1：绘图区，固定 1/3 宽度，位于最左侧 ──

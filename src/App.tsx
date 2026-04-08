@@ -60,7 +60,7 @@ export default function App() {
 
   return (
     <div
-      className="bg-gray-100 text-gray-800 font-sans min-h-screen flex flex-col overflow-hidden"
+      className="bg-gray-100 text-gray-800 font-sans h-full flex flex-col overflow-hidden"
     >
       {/* 顶部导航栏 */}
       <Navbar />
@@ -80,7 +80,7 @@ export default function App() {
         <div
           className="bg-gray-50 flex flex-col relative overflow-y-auto"
           style={{
-            width: '23%', minWidth: '200px', scrollbarWidth: 'none',
+            width: '23%', minWidth: '200px',
             borderLeft: '1px solid #e5e7eb', borderRight: '1px solid #e5e7eb'
           }}
         >
@@ -99,7 +99,6 @@ export default function App() {
         {/* ── 列 3：结果报告区（最右，自动占满剩余空间） ── */}
         <div
           className="flex-1 bg-white flex flex-col relative overflow-y-auto"
-          style={{ scrollbarWidth: 'none' }}
         >
           <div className="p-8 flex flex-col gap-6 w-full">
             <ResultPanel
