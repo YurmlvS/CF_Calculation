@@ -1,13 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { CalcParams, CalcTarget } from './types';
-import { buildPhiTable } from './utils/phiUtils';
-import { calculate } from './utils/calculate';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { modules, getModuleById, defaultModuleId } from './modules';
 import Navbar from './components/Navbar';
-import DiagramPanel from './components/DiagramPanel';
 import ParamsPanel from './components/ParamsPanel';
-import ResultPanel from './components/ResultPanel';
 
-// 全局 Window 声明，避免 TypeScript 报错
+// 全局 Window 声明
 declare global {
   interface Window {
     html2pdf: any;
@@ -16,18 +12,27 @@ declare global {
 }
 
 export default function App() {
-  // --- 状态定义 ---
-  const [currentModule, setCurrentModule] = useState('y_brace');
-  const [calcTarget, setCalcTarget] = useState<CalcTarget>('weak');
+  // --- 当前模块 ID ---
+  const [currentModuleId, setCurrentModuleId] = useState(defaultModuleId);
+
+  // --- 解析当前活跃模块 ---
+  const activeModule = useMemo(
+    () => getModuleById(currentModuleId) ?? modules[0],
+    [currentModuleId],
+  );
+
+  // --- 参数状态 ---
+  const [params, setParams] = useState<Record<string, number | ''>>(() => ({
+    ...activeModule.defaultParams,
+  }));
+
+  // --- 计算目标 ---
+  const [calcTarget, setCalcTarget] = useState(activeModule.defaultCalcTarget);
+
+  // --- Konva 加载状态 ---
   const [isKonvaLoaded, setIsKonvaLoaded] = useState(false);
-  const [params, setParams] = useState<CalcParams>({
-    n: '', m: '', mu: '', R: '', I: '', A: '', f: '',
-  });
 
-  // --- 构建 φ 查表字典（仅初始化一次） ---
-  const phiTable = useMemo(() => buildPhiTable(), []);
-
-  // --- 动态加载 Konva.js（CDN） ---
+  // --- 动态加载 Konva.js ---
   useEffect(() => {
     if (!window.Konva) {
       const script = document.createElement('script');
@@ -39,24 +44,34 @@ export default function App() {
     }
   }, []);
 
-  // --- 切换计算目标时清除 I 和 A ---
-  useEffect(() => {
-    setParams((prev) => ({ ...prev, I: '', A: '' }));
-  }, [calcTarget]);
+  // --- 切换模块时重置参数和计算目标 ---
+  const handleModuleChange = useCallback((moduleId: string) => {
+    const mod = getModuleById(moduleId);
+    if (!mod) return;
+    setCurrentModuleId(moduleId);
+    setParams({ ...mod.defaultParams });
+    setCalcTarget(mod.defaultCalcTarget);
+  }, []);
 
   // --- 核心计算 ---
   const calcResult = useMemo(
-    () => calculate(params, calcTarget, phiTable),
-    [params, calcTarget, phiTable],
+    () => activeModule.calculate(params, calcTarget),
+    [params, calcTarget, activeModule],
   );
 
   // --- 处理输入变化 ---
-  const handleInputChange =
-    (key: keyof CalcParams) =>
+  const handleInputChange = useCallback(
+    (key: string) =>
       (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
         setParams((prev) => ({ ...prev, [key]: val === '' ? '' : Number(val) }));
-      };
+      },
+    [],
+  );
+
+  // --- 获取模块提供的面板组件 ---
+  const ModuleDiagram = activeModule.DiagramPanel;
+  const ModuleResult = activeModule.ResultPanel;
 
   return (
     <div
@@ -65,18 +80,13 @@ export default function App() {
       {/* 顶部导航栏 */}
       <Navbar />
 
-      {/* ========================================================
-          主体三列布局（从左到右）：
-            列 1 — Konva 绘图区  width: 33.33%（1/3，最左）
-            列 2 — 参数输入区  width: 20%（约 1/5，居中）
-            列 3 — 结果报告区  flex-1（占剩余全部宽度，最右）
-          ======================================================== */}
+      {/* 主体三列布局 */}
       <main className="flex flex-1 overflow-hidden relative">
 
-        {/* ── 列 1：Konva 绘图区（最左，固定 1/3 宽度） ── */}
-        <DiagramPanel params={params} isKonvaLoaded={isKonvaLoaded} />
+        {/* ── 列 1：Konva 绘图区（由模块提供） ── */}
+        <ModuleDiagram params={params} isKonvaLoaded={isKonvaLoaded} />
 
-        {/* ── 列 2：参数输入区（居中，固定约 1/5 宽度） ── */}
+        {/* ── 列 2：参数输入区 ── */}
         <div
           className="bg-gray-50 flex flex-col relative overflow-y-auto"
           style={{
@@ -86,8 +96,9 @@ export default function App() {
         >
           <div className="p-5 flex flex-col gap-5 w-full">
             <ParamsPanel
-              currentModule={currentModule}
-              onModuleChange={setCurrentModule}
+              currentModuleId={currentModuleId}
+              onModuleChange={handleModuleChange}
+              activeModule={activeModule}
               params={params}
               onParamChange={handleInputChange}
               calcTarget={calcTarget}
@@ -96,12 +107,59 @@ export default function App() {
           </div>
         </div>
 
-        {/* ── 列 3：结果报告区（最右，自动占满剩余空间） ── */}
+        {/* ── 列 3：结果报告区（由模块提供） ── */}
         <div
           className="flex-1 bg-white flex flex-col relative overflow-y-auto"
         >
           <div className="p-8 flex flex-col gap-6 w-full">
-            <ResultPanel
+            {/* 标题行 + 导出按钮 */}
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                结果报告 (Result Report)
+              </h2>
+              <div className="flex gap-2">
+                <button
+                  id="btn-export-word"
+                  onClick={() => activeModule.exportToWord(calcResult, params, calcTarget)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.25rem',
+                    backgroundColor: '#2563eb', color: '#fff',
+                    padding: '0.4rem 0.75rem', borderRadius: '0.375rem',
+                    fontSize: '0.8125rem', fontWeight: 500,
+                    cursor: 'pointer', border: 'none',
+                    boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+                    transition: 'background-color 0.15s',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1d4ed8')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#2563eb')}
+                >
+                  导出 Word
+                </button>
+                <button
+                  id="btn-export-pdf"
+                  onClick={() => void activeModule.exportToPDF(calcResult)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.25rem',
+                    backgroundColor: '#1e293b', color: '#fff',
+                    padding: '0.4rem 0.75rem', borderRadius: '0.375rem',
+                    fontSize: '0.8125rem', fontWeight: 500,
+                    cursor: 'pointer', border: 'none',
+                    boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+                    transition: 'background-color 0.15s',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#334155')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#1e293b')}
+                >
+                  导出 PDF
+                </button>
+              </div>
+            </div>
+
+            <ModuleResult
               params={params}
               calcResult={calcResult}
               calcTarget={calcTarget}
