@@ -40,6 +40,12 @@ const DiagramPanel: React.FC<ModuleDiagramProps> = ({ params, isKonvaLoaded }) =
     const drawOrUpdateGraphics = () => {
       const drawN = params.n === '' ? 4800 : Number(params.n);
       const drawM = params.m === '' ? 2144 : Number(params.m);
+      // k clamp: 0.1~0.9, default 0.5; maps brace intersection point along the brace
+      const rawK = params.k === '' ? 0.5 : Number(params.k);
+      const kVal = Math.min(0.9, Math.max(0.1, rawK));
+      // Round to nearest 0.1
+      const kSnap = Math.round(kVal * 10) / 10;
+
       const W = stageRef.current.width();
       const H = stageRef.current.height();
       const padding = 140;
@@ -52,9 +58,15 @@ const DiagramPanel: React.FC<ModuleDiagramProps> = ({ params, isKonvaLoaded }) =
       const cy = H / 2 - scaledN / 2;
       const group = shapeGroupRef.current;
 
+      // brace goes from (cx, cy+scaledN) to (cx+scaledM, cy)
+      // testline second point = k position along brace
+      // brace start = bottom-left (cx, cy+scaledN), end = top-right (cx+scaledM, cy)
+      const braceX2 = cx + kSnap * scaledM;
+      const braceY2 = cy + scaledN - kSnap * scaledN;
+
       if (group.getChildren().length === 0) {
         const wall = new window.Konva.Line({ id: 'wall', points: [cx, cy - 80, cx, cy + scaledN - 80], stroke: '#4b5563', strokeWidth: 3, lineCap: 'square' });
-        const testline = new window.Konva.Line({ id: 'testline', points: [cx + 40, cy, cx + scaledM / 2 - 40, cy + scaledN / 2], stroke: '#4b5563', strokeWidth: 3, lineCap: 'square' });
+        const testline = new window.Konva.Line({ id: 'testline', points: [cx + 40, cy, braceX2, braceY2], stroke: '#4b5563', strokeWidth: 3, lineCap: 'square' });
         const slab = new window.Konva.Line({ id: 'slab', points: [cx - 40, cy, cx + scaledM + 40, cy], stroke: '#4b5563', strokeWidth: 3, lineCap: 'square' });
         const brace = new window.Konva.Line({ id: 'brace', points: [cx, cy + scaledN, cx + scaledM, cy], stroke: '#4b5563', strokeWidth: 3, opacity: 0.8, lineCap: 'round' });
 
@@ -66,12 +78,13 @@ const DiagramPanel: React.FC<ModuleDiagramProps> = ({ params, isKonvaLoaded }) =
         const tickM2 = new window.Konva.Line({ id: 'tickM2', points: [cx + scaledM, cy - 35, cx + scaledM, cy - 25], stroke: '#9ca3af', strokeWidth: 2 });
         const labelN = new window.Konva.Text({ id: 'labelN', text: 'n', fontSize: 18, fill: '#374151', fontStyle: 'bold' });
         const labelM = new window.Konva.Text({ id: 'labelM', text: 'm', fontSize: 18, fill: '#374151', fontStyle: 'bold' });
-        const labelBrace = new window.Konva.Text({ id: 'labelBrace', text: '中点', fontSize: 18, fill: '#1d4ed8', fontStyle: 'bold' });
-        group.add(wall, testline, slab, brace, dimLineN, tickN1, tickN2, dimLineM, tickM1, tickM2, labelN, labelM, labelBrace);
+        // k label at intersection point
+        const labelK = new window.Konva.Text({ id: 'labelK', text: `k=${kSnap}`, fontSize: 14, fill: '#1d4ed8', fontStyle: 'bold' });
+        group.add(wall, testline, slab, brace, dimLineN, tickN1, tickN2, dimLineM, tickM1, tickM2, labelN, labelM, labelK);
       }
 
       const ease = window.Konva.Easings.EaseInOut;
-      new window.Konva.Tween({ node: group.findOne('#testline'), duration: 0.4, points: [cx + 40, cy, cx + scaledM / 2, cy + scaledN / 2], easing: ease }).play();
+      new window.Konva.Tween({ node: group.findOne('#testline'), duration: 0.4, points: [cx + 40, cy, braceX2, braceY2], easing: ease }).play();
       new window.Konva.Tween({ node: group.findOne('#wall'), duration: 0.4, points: [cx, cy - 0, cx, cy + scaledN + 40], easing: ease }).play();
       new window.Konva.Tween({ node: group.findOne('#slab'), duration: 0.4, points: [cx - 0, cy, cx + scaledM + 40, cy], easing: ease }).play();
       new window.Konva.Tween({ node: group.findOne('#brace'), duration: 0.4, points: [cx, cy + scaledN, cx + scaledM, cy], easing: ease }).play();
@@ -83,7 +96,10 @@ const DiagramPanel: React.FC<ModuleDiagramProps> = ({ params, isKonvaLoaded }) =
       new window.Konva.Tween({ node: group.findOne('#tickM2'), duration: 0.4, points: [cx + scaledM, cy - 35, cx + scaledM, cy - 25], easing: ease }).play();
       new window.Konva.Tween({ node: group.findOne('#labelN'), duration: 0.4, x: cx - 55, y: cy + scaledN / 2 - 10 }).play();
       new window.Konva.Tween({ node: group.findOne('#labelM'), duration: 0.4, x: cx + scaledM / 2 - 10, y: cy - 55 }).play();
-      new window.Konva.Tween({ node: group.findOne('#labelBrace'), duration: 0.4, x: cx + scaledM / 2 + 10, y: cy + scaledN / 2 + 10 }).play();
+      new window.Konva.Tween({ node: group.findOne('#labelK'), duration: 0.4, x: braceX2 + 8, y: braceY2 + 4 }).play();
+      // Update text content for k label
+      const labelKNode = group.findOne('#labelK');
+      if (labelKNode) labelKNode.text(`k=${kSnap}`);
     };
 
     drawFnRef.current = drawOrUpdateGraphics;
@@ -92,7 +108,7 @@ const DiagramPanel: React.FC<ModuleDiagramProps> = ({ params, isKonvaLoaded }) =
     return () => {
       observerRef.current?.disconnect();
     };
-  }, [params.n, params.m, isKonvaLoaded]);
+  }, [params.n, params.m, params.k, isKonvaLoaded]);
 
   return (
     <div

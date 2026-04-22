@@ -74,7 +74,7 @@ export interface CalcModule {
   ResultPanel: React.FC<ModuleResultProps>;
 
   /** 导出 Word */
-  exportToWord: (calcResult: any, params: Record<string, number | ''>, calcTarget: string) => void;
+  exportToWord: (calcResult: any, params: Record<string, number | ''>, calcTarget: string) => void | Promise<void>;
 
   /** 导出 PDF */
   exportToPDF: (calcResult: any) => Promise<void>;
