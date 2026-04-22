@@ -6,4 +6,12 @@ services:
     container_name: cf-calculation
     ports:
       - "7033:7033"
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     restart: unless-stopped

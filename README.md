@@ -67,6 +67,7 @@ npm run tauri build
 - `docker-compose.yml`
 
 部署后容器内部和宿主机都使用 `7033` 端口。
+当前运行时镜像使用非 root 的 Nginx 版本，并在 `docker-compose.yml` 中启用了只读根文件系统、`tmpfs` 临时目录和 `no-new-privileges` 等安全限制。
 
 ### 方式一：直接用 Docker
 
