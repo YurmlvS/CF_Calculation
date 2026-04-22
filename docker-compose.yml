@@ -1,0 +1,9 @@
+services:
+  cf-calculation:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cf-calculation
+    ports:
+      - "7033:7033"
+    restart: unless-stopped

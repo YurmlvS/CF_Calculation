@@ -58,6 +58,55 @@ npm run build
 npm run tauri build
 ```
 
+## Docker 部署到 Ubuntu
+
+如果你的目标是在 Ubuntu 服务器上通过 Docker 部署这个项目，当前仓库已经包含可直接使用的：
+
+- `Dockerfile`
+- `docker/nginx.conf`
+- `docker-compose.yml`
+
+部署后容器内部和宿主机都使用 `7033` 端口。
+
+### 方式一：直接用 Docker
+
+```bash
+docker build -t cf-calculation:latest .
+docker run -d --name cf-calculation -p 7033:7033 --restart unless-stopped cf-calculation:latest
+```
+
+启动完成后访问：
+
+```text
+http://<你的Ubuntu服务器IP>:7033
+```
+
+### 方式二：使用 Docker Compose
+
+```bash
+docker compose up -d --build
+```
+
+同样会暴露：
+
+```text
+http://<你的Ubuntu服务器IP>:7033
+```
+
+### 停止与重启
+
+```bash
+docker compose down
+docker compose up -d
+```
+
+或如果你使用的是 `docker run`：
+
+```bash
+docker stop cf-calculation
+docker start cf-calculation
+```
+
 ## 环境要求
 
 | 工具 | 建议版本 |
