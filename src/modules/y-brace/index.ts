@@ -7,7 +7,7 @@ import { paramFields, defaultParams, calcTargets, defaultCalcTarget } from './pa
 import { calculate } from './calculate';
 import DiagramPanel from './DiagramPanel';
 import ResultPanel from './ResultPanel';
-import { exportToWord, exportToPDF } from './exportUtils';
+import { exportToWord, exportToLaTeX, exportToPDF } from './exportUtils';
 
 const yBraceModule: CalcModule = {
   info: {
@@ -22,6 +22,7 @@ const yBraceModule: CalcModule = {
   DiagramPanel,
   ResultPanel,
   exportToWord,
+  exportToLaTeX,
   exportToPDF,
 };
 

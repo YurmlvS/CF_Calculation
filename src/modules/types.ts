@@ -76,6 +76,9 @@ export interface CalcModule {
   /** 导出 Word */
   exportToWord: (calcResult: any, params: Record<string, number | ''>, calcTarget: string) => void | Promise<void>;
 
+  /** 导出 LaTeX (基于HTML生成的Word) */
+  exportToLaTeX?: (calcResult: any, params: Record<string, number | ''>, calcTarget: string) => void | Promise<void>;
+
   /** 导出 PDF */
   exportToPDF: (calcResult: any) => Promise<void>;
 }

@@ -122,23 +122,79 @@ export default function App() {
                 结果报告 (Result Report)
               </h2>
               <div className="flex gap-2">
-                <button
-                  id="btn-export-word"
-                  onClick={() => activeModule.exportToWord(calcResult, params, calcTarget)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '0.25rem',
-                    backgroundColor: '#2563eb', color: '#fff',
-                    padding: '0.4rem 0.75rem', borderRadius: '0.375rem',
-                    fontSize: '0.8125rem', fontWeight: 500,
-                    cursor: 'pointer', border: 'none',
-                    boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
-                    transition: 'background-color 0.15s',
+                <div 
+                  className="relative"
+                  onMouseEnter={(e) => {
+                    const dropdown = e.currentTarget.querySelector('.latex-dropdown');
+                    if (dropdown instanceof HTMLElement) {
+                      dropdown.style.opacity = '1';
+                      dropdown.style.visibility = 'visible';
+                      dropdown.style.transform = 'translateY(0)';
+                    }
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1d4ed8')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#2563eb')}
+                  onMouseLeave={(e) => {
+                    const dropdown = e.currentTarget.querySelector('.latex-dropdown');
+                    if (dropdown instanceof HTMLElement) {
+                      dropdown.style.opacity = '0';
+                      dropdown.style.visibility = 'hidden';
+                      dropdown.style.transform = 'translateY(-5px)';
+                    }
+                  }}
                 >
-                  导出 Word
-                </button>
+                  <button
+                    id="btn-export-word"
+                    onClick={() => activeModule.exportToWord(calcResult, params, calcTarget)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '0.25rem',
+                      backgroundColor: '#2563eb', color: '#fff',
+                      padding: '0.4rem 0.75rem', borderRadius: '0.375rem',
+                      fontSize: '0.8125rem', fontWeight: 500,
+                      cursor: 'pointer', border: 'none',
+                      boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+                      transition: 'background-color 0.15s',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1d4ed8')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#2563eb')}
+                  >
+                    导出 Word
+                  </button>
+                  <div 
+                    className="latex-dropdown absolute left-0 mt-1 w-full z-10"
+                    style={{
+                      opacity: 0,
+                      visibility: 'hidden',
+                      transform: 'translateY(-5px)',
+                      transition: 'all 0.2s ease-in-out'
+                    }}
+                  >
+                    <button
+                      onClick={() => {
+                        if (activeModule.exportToLaTeX) {
+                          activeModule.exportToLaTeX(calcResult, params, calcTarget);
+                        } else {
+                          alert("当前模块不支持导出LaTeX版功能");
+                        }
+                      }}
+                      style={{
+                        width: '100%',
+                        backgroundColor: '#ffffff',
+                        color: '#2563eb',
+                        padding: '0.4rem 0',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.75rem',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        border: '1px solid #bfdbfe',
+                        boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+                        transition: 'background-color 0.15s',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#eff6ff')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
+                    >
+                      导出LaTeX版
+                    </button>
+                  </div>
+                </div>
                 <button
                   id="btn-export-pdf"
                   onClick={() => void activeModule.exportToPDF(calcResult)}
