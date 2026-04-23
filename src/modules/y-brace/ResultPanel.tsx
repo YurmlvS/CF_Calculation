@@ -12,6 +12,16 @@ const safeRenderKatex = (tex: string) => {
   }
 };
 
+const LAMBDA_LIMIT = 200;
+
+const isLambdaSafe = (r: YBraceAxisResult) => r.lambda < LAMBDA_LIMIT;
+const isAxisCheckSafe = (r: YBraceAxisResult) => isLambdaSafe(r) && r.isSafe;
+
+const buildLambdaRequirementText = (r: YBraceAxisResult) =>
+  isLambdaSafe(r)
+    ? `< ${LAMBDA_LIMIT} \\text{ (满足构造要求)}`
+    : `\\ge ${LAMBDA_LIMIT} \\text{ (构造要求不满足)}`;
+
 /**
  * 渲染单轴计算过程的 LaTeX aligned 字符串
  */
@@ -23,6 +33,7 @@ function buildAxisLatex(
   const { n, m, mu, R, I, IPrime, A, k, f } = params;
   const kVal = k === '' ? 0.5 : Number(k);
   const kSnap = Math.round(Math.min(0.9, Math.max(0.1, kVal)) * 10) / 10;
+  const lambdaRequirementText = buildLambdaRequirementText(r);
 
   const safeText = r.isSafe
     ? `< f = ${f} \\text{ (满足要求)}`
@@ -33,10 +44,11 @@ function buildAxisLatex(
     return `
       \\begin{aligned}
       a &= \\arctan(n/m) = \\arctan(${n}/${m}) = ${r.a_deg}^\\circ \\\\[8pt]
-      h_0 &= \\max\\!\\left[\\frac{\\mu n}{\\sin a}k,\\ \\frac{\\mu n}{\\sin a}(1-k)\\right] = \\max\\!\\left[${full}\\times${kSnap},\\ ${full}\\times${(1 - kSnap).toFixed(1)}\\right] = ${r.h0.toFixed(1)}\\text{ mm} \\\\[8pt]
+      h_0 &= \\max\\!\\left[\\frac{\\mu n}{\\sin a}k,\\ \\frac{\\mu n}{\\sin a}(1-k)\\right] \\\\[8pt]
+      &= \\max\\!\\left[${full}\\times${kSnap},\\ ${full}\\times${(1 - kSnap).toFixed(1)}\\right] = ${r.h0.toFixed(1)}\\text{ mm} \\\\[8pt]
       N_x &= R / \\sin a = ${R} / \\sin ${r.a_deg}^\\circ = ${r.Nx.toFixed(2)}\\text{ kN} \\\\[8pt]
       i &= \\sqrt{I/A} = \\sqrt{${I}/${A}} = ${r.i_val.toFixed(2)}\\text{ cm} \\\\[8pt]
-      \\lambda &= h_0/i = ${r.h0.toFixed(1)} / ${(r.i_val * 10).toFixed(2)} = ${r.lambda.toFixed(2)} \\\\[8pt]
+      \\lambda &= h_0/i = ${r.h0.toFixed(1)} / ${(r.i_val * 10).toFixed(2)} = ${r.lambda.toFixed(2)} ${lambdaRequirementText} \\\\[8pt]
       \\text{查表取 } \\lambda = ${Math.ceil(r.lambda)} &\\rightarrow \\phi = ${r.phi} \\\\[8pt]
       \\sigma &= \\frac{N_x \\times 10}{\\phi A} = \\frac{${r.Nx.toFixed(2)} \\times 10}{${r.phi} \\times ${A}} = \\mathbf{${r.sigma.toFixed(2)}} ${safeText}
       \\end{aligned}
@@ -48,7 +60,7 @@ function buildAxisLatex(
       h_0' &= \\mu n / \\sin a = ${mu} \\times ${n} / \\sin ${r.a_deg}^\\circ = ${r.h0.toFixed(0)}\\text{ mm} \\\\[8pt]
       N_x &= R / \\sin a = ${R} / \\sin ${r.a_deg}^\\circ = ${r.Nx.toFixed(2)}\\text{ kN} \\\\[8pt]
       i' &= \\sqrt{I'/A} = \\sqrt{${IPrime}/${A}} = ${r.i_val.toFixed(2)}\\text{ cm} \\\\[8pt]
-      \\lambda &= \\mu h_0' / i' = ${r.h0.toFixed(0)} / ${(r.i_val * 10).toFixed(2)} = ${r.lambda.toFixed(2)} \\\\[8pt]
+      \\lambda &= \\mu h_0' / i' = ${r.h0.toFixed(0)} / ${(r.i_val * 10).toFixed(2)} = ${r.lambda.toFixed(2)} ${lambdaRequirementText} \\\\[8pt]
       \\text{查表取 } \\lambda = ${Math.ceil(r.lambda)} &\\rightarrow \\phi = ${r.phi} \\\\[8pt]
       \\sigma &= \\frac{N_x \\times 10}{\\phi A} = \\frac{${r.Nx.toFixed(2)} \\times 10}{${r.phi} \\times ${A}} = \\mathbf{${r.sigma.toFixed(2)}} ${safeText}
       \\end{aligned}
@@ -105,6 +117,7 @@ const ResultPanel: React.FC<ModuleResultProps> = ({ params, calcResult, calcTarg
       const kVal = k === '' ? 0.5 : Number(k);
       const kSnap = Math.round(Math.min(0.9, Math.max(0.1, kVal)) * 10) / 10;
 
+      const lambdaRequirementText = buildLambdaRequirementText(r);
       const safeText = r.isSafe ? `< f = ${f} \\text{ (满足要求)}` : `\\ge f = ${f} \\text{ (不满足)}`;
       const eqAngle = `a = \\arctan(n/m) = \\arctan(${n}/${m}) = ${r.a_deg}^\\circ`;
       const eqNx = `N_x = R / \\sin a = ${R} / \\sin ${r.a_deg}^\\circ = ${r.Nx.toFixed(2)}\\text{ kN}`;
@@ -115,12 +128,12 @@ const ResultPanel: React.FC<ModuleResultProps> = ({ params, calcResult, calcTarg
         const full = (Number(mu) * Number(n) / r.sin_a).toFixed(1);
         const eqH0 = `h_0 = \\max\\!\\left[\\frac{\\mu n}{\\sin a}k,\\ \\frac{\\mu n}{\\sin a}(1{-}k)\\right] = \\max[${full}\\times${kSnap},\\ ${full}\\times${(1 - kSnap).toFixed(1)}] = ${r.h0.toFixed(1)}\\text{ mm}`;
         const eqI = `i = \\sqrt{I/A} = \\sqrt{${I}/${A}} = ${r.i_val.toFixed(2)}\\text{ cm}`;
-        const eqLambda = `\\lambda = h_0/i = ${r.h0.toFixed(1)} / ${(r.i_val * 10).toFixed(2)} = ${r.lambda.toFixed(2)}`;
+        const eqLambda = `\\lambda = h_0/i = ${r.h0.toFixed(1)} / ${(r.i_val * 10).toFixed(2)} = ${r.lambda.toFixed(2)} ${lambdaRequirementText}`;
         return { eqAngle, eqH0, eqNx, eqI, eqLambda, eqPhi, eqSigma };
       } else {
         const eqH0 = `h_0' = \\mu n / \\sin a = ${mu} \\times ${n} / \\sin ${r.a_deg}^\\circ = ${r.h0.toFixed(0)}\\text{ mm}`;
         const eqI = `i' = \\sqrt{I'/A} = \\sqrt{${IPrime}/${A}} = ${r.i_val.toFixed(2)}\\text{ cm}`;
-        const eqLambda = `\\lambda = \\mu h_0' / i' = ${r.h0.toFixed(0)} / ${(r.i_val * 10).toFixed(2)} = ${r.lambda.toFixed(2)}`;
+        const eqLambda = `\\lambda = \\mu h_0' / i' = ${r.h0.toFixed(0)} / ${(r.i_val * 10).toFixed(2)} = ${r.lambda.toFixed(2)} ${lambdaRequirementText}`;
         return { eqAngle, eqH0, eqNx, eqI, eqLambda, eqPhi, eqSigma };
       }
     };
@@ -157,6 +170,8 @@ const ResultPanel: React.FC<ModuleResultProps> = ({ params, calcResult, calcTarg
     wordHtmls: AxisHtmls,
   ) => {
     const h0Label = axisKey === 'weak' ? '下撑杆件弱轴方向计算长度计算：' : '下撑杆件强轴方向计算长度计算：';
+    const lambdaSafe = axisResult ? isLambdaSafe(axisResult) : false;
+    const axisSafe = axisResult ? isAxisCheckSafe(axisResult) : false;
     return (
       <div className="mb-4">
         <h4 className="text-sm font-semibold text-gray-600 mb-2">
@@ -170,8 +185,11 @@ const ResultPanel: React.FC<ModuleResultProps> = ({ params, calcResult, calcTarg
             <span>λ = {axisResult.lambda.toFixed(2)}</span>
             <span>φ = {axisResult.phi}</span>
             <span>σ = {axisResult.sigma.toFixed(2)} N/mm²</span>
-            <span style={{ color: axisResult.isSafe ? '#16a34a' : '#dc2626', fontWeight: 700 }}>
-              {axisResult.isSafe ? '✓ 满足' : '✗ 不满足'}
+            <span style={{ color: lambdaSafe ? '#16a34a' : '#dc2626', fontWeight: 700 }}>
+              {lambdaSafe ? '✓ 构造满足' : '✗ 构造要求不满足'}
+            </span>
+            <span style={{ color: axisSafe ? '#16a34a' : '#dc2626', fontWeight: 700 }}>
+              {axisSafe ? '✓ 满足' : '✗ 不满足'}
             </span>
           </div>
         ) : null}
@@ -204,8 +222,12 @@ const ResultPanel: React.FC<ModuleResultProps> = ({ params, calcResult, calcTarg
   // Overall safety
   const overallSafe = result
     ? (result.mode === 'both'
-        ? (result.weak?.isSafe ?? true) && (result.strong?.isSafe ?? true)
-        : result.isSafe)
+        ? Boolean(result.weak && result.strong && isAxisCheckSafe(result.weak) && isAxisCheckSafe(result.strong))
+        : result.weak
+          ? isAxisCheckSafe(result.weak)
+          : result.strong
+            ? isAxisCheckSafe(result.strong)
+            : false)
     : null;
 
   return (
@@ -216,11 +238,11 @@ const ResultPanel: React.FC<ModuleResultProps> = ({ params, calcResult, calcTarg
       {/* ── 供导出的报告容器 ── */}
       <div
         id="export-area"
-        className="bg-white border border-gray-200 shadow-sm rounded-xl p-6 relative"
+        className="bg-white border border-gray-200 shadow-sm rounded-xl px-4 relative"
         style={{ flex: 1 }}
       >
         {/* 报告标题 */}
-        <div className="border-b border-gray-100 pb-4 mb-4">
+        <div className="border-b border-gray-100 px-4 mb-4">
           <h3 className="text-xl font-bold text-center text-gray-800">Y撑复核验算书</h3>
           <p className="text-center text-xs text-gray-400 mt-1">
             验算方向: {calcTarget === 'both' ? '强/弱轴' : calcTarget === 'weak' ? '弱轴' : '强轴'} | 生成时间: {currentTime}
@@ -234,11 +256,11 @@ const ResultPanel: React.FC<ModuleResultProps> = ({ params, calcResult, calcTarg
           </h4>
           {result ? (
             <ul
-              className="list-disc list-inside text-sm text-gray-700 ml-2"
+              className="list-disc list-inside text-cs text-gray-700 ml-2"
               style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.25rem' }}
             >
-              <li>(支撑上下固定点的竖向距离) n = {params.n} mm</li>
-              <li>(支撑上下固定点的水平距离) m = {params.m} mm</li>
+              <li>n(支撑上下固定点的竖向距离) = {params.n} mm</li>
+              <li>m(支撑上下固定点的水平距离) = {params.m} mm</li>
               <li>μ(计算长度系数) = {params.mu}</li>
               <li>R(下撑杆件支座力) = {params.R} kN</li>
               <li>A(下撑杆截面积) = {params.A} cm²</li>

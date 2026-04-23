@@ -138,6 +138,11 @@ body {
   /* 原 0.875rem → 约 +15% */
   line-height: 1.5rem;
 }
+.text-cs {
+  font-size: 0.775rem;
+  /* 原 0.75rem → 约 +15% */
+  line-height: 1.5rem;
+}
 .text-st{
   font-size: 0.8rem;
   /* 原 0.75rem → 约 +10% */
@@ -405,6 +410,9 @@ body {
 
 .pb-4 {
   padding-bottom: 1rem;
+}
+.px-4 {
+  padding-bottom: 0.3rem;
 }
 
 .pt-4 {

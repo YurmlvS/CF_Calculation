@@ -37,6 +37,22 @@ type CalcParams = Record<string, number | ''>;
 type Axis = 'weak' | 'strong';
 type MathPart = string | MathComponent | readonly MathComponent[];
 
+const LAMBDA_LIMIT = 200;
+
+function isLambdaSafe(r: YBraceAxisResult): boolean {
+  return r.lambda < LAMBDA_LIMIT;
+}
+
+function isAxisCheckSafe(r: YBraceAxisResult): boolean {
+  return isLambdaSafe(r) && r.isSafe;
+}
+
+function getLambdaRequirementText(r: YBraceAxisResult): string {
+  return isLambdaSafe(r)
+    ? `< ${LAMBDA_LIMIT}（满足构造要求）`
+    : `≥ ${LAMBDA_LIMIT}（构造要求不满足）`;
+}
+
 function paraText(text: string, bold = false, size = FONT_SIZES.NORMAL): Paragraph {
   return new Paragraph({
     children: [
@@ -253,6 +269,7 @@ function buildAxisParagraphs(axis: Axis, r: YBraceAxisResult, params: CalcParams
   const { n, m, mu, R, I, IPrime, A, k } = params;
   const kValue = k === '' ? 0.5 : Number(k);
   const kSnap = Math.round(Math.min(0.9, Math.max(0.1, kValue)) * 10) / 10;
+  const lambdaStr = getLambdaRequirementText(r);
   const safeStr = r.isSafe ? '< f（满足要求）' : '≥ f（不满足要求）';
   const { h0Label, iLabel } = getAxisSummary(axis);
 
@@ -274,7 +291,7 @@ function buildAxisParagraphs(axis: Axis, r: YBraceAxisResult, params: CalcParams
       paraText(iLabel),
       paraFormula(`i = sqrt(I/A) = sqrt(${I}/${A}) = ${r.i_val.toFixed(2)} cm`),
       paraText('下撑杆长细比：'),
-      paraFormula(`λ = h0/i = ${r.h0.toFixed(1)} / ${(r.i_val * 10).toFixed(2)} = ${r.lambda.toFixed(2)}`),
+      paraFormula(`λ = h0/i = ${r.h0.toFixed(1)} / ${(r.i_val * 10).toFixed(2)} = ${r.lambda.toFixed(2)} ${lambdaStr}`),
     );
   } else {
     paras.push(
@@ -287,7 +304,7 @@ function buildAxisParagraphs(axis: Axis, r: YBraceAxisResult, params: CalcParams
       paraText(iLabel),
       paraFormula(`i' = sqrt(I'/A) = sqrt(${IPrime}/${A}) = ${r.i_val.toFixed(2)} cm`),
       paraText('下撑杆长细比：'),
-      paraFormula(`λ = h0'/i' = ${r.h0.toFixed(0)} / ${(r.i_val * 10).toFixed(2)} = ${r.lambda.toFixed(2)}`),
+      paraFormula(`λ = h0'/i' = ${r.h0.toFixed(0)} / ${(r.i_val * 10).toFixed(2)} = ${r.lambda.toFixed(2)} ${lambdaStr}`),
     );
   }
 
@@ -393,15 +410,23 @@ function buildStrongIMath(momentPrime: number | '', area: number | '', iValue: n
 }
 
 function buildWeakLambdaMath(h0Value: number, iValueCm: number, lambdaValue: number): MathComponent[] {
+  const compareText = lambdaValue < LAMBDA_LIMIT
+    ? ` < ${LAMBDA_LIMIT} (满足构造要求)`
+    : ` ≥ ${LAMBDA_LIMIT} (构造要求不满足)`;
+
   return mathSeq(
     'λ = ',
     mathFrac([mathSub('h', '0')], [mathRun('i')]),
-    ` = ${h0Value.toFixed(1)} / ${(iValueCm * 10).toFixed(2)} = ${lambdaValue.toFixed(2)}`,
+    ` = ${h0Value.toFixed(1)} / ${(iValueCm * 10).toFixed(2)} = ${lambdaValue.toFixed(2)}${compareText}`,
   );
 }
 
 function buildStrongLambdaMath(h0Value: number, iValueCm: number, lambdaValue: number): MathComponent[] {
-  return mathSeq(`λ = h0' / i' = ${h0Value.toFixed(0)} / ${(iValueCm * 10).toFixed(2)} = ${lambdaValue.toFixed(2)}`);
+  const compareText = lambdaValue < LAMBDA_LIMIT
+    ? ` < ${LAMBDA_LIMIT} (满足构造要求)`
+    : ` ≥ ${LAMBDA_LIMIT} (构造要求不满足)`;
+
+  return mathSeq(`λ = h0' / i' = ${h0Value.toFixed(0)} / ${(iValueCm * 10).toFixed(2)} = ${lambdaValue.toFixed(2)}${compareText}`);
 }
 
 async function buildAxisParagraphsLatex(axis: Axis, r: YBraceAxisResult, params: CalcParams): Promise<Paragraph[]> {
@@ -460,8 +485,12 @@ function buildCommonDocumentChildren(
 ): Paragraph[] {
   const now = new Date().toLocaleString('zh-CN', { hour12: false });
   const overallSafe = calcResult.mode === 'both'
-    ? (calcResult.weak?.isSafe ?? true) && (calcResult.strong?.isSafe ?? true)
-    : calcResult.isSafe;
+    ? Boolean(calcResult.weak && calcResult.strong && isAxisCheckSafe(calcResult.weak) && isAxisCheckSafe(calcResult.strong))
+    : calcResult.weak
+      ? isAxisCheckSafe(calcResult.weak)
+      : calcResult.strong
+        ? isAxisCheckSafe(calcResult.strong)
+        : false;
 
   return [
     new Paragraph({
