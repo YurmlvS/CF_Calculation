@@ -149,6 +149,10 @@ const DiagramPanel: React.FC<ModuleDiagramProps> = ({ params, isKonvaLoaded }) =
       new window.Konva.Tween({ node: group.findOne('#labelL0'), duration: 0.4, x: dimL0.label.x, y: dimL0.label.y, rotation: dimL0.label.rotation }).play();
       new window.Konva.Tween({ node: group.findOne('#labelL1'), duration: 0.4, x: dimL1.label.x, y: dimL1.label.y, rotation: dimL1.label.rotation }).play();
       new window.Konva.Tween({ node: group.findOne('#labelK'), duration: 0.4, x: braceX2 + 8, y: braceY2 + 4 }).play();
+      const labelNNode = group.findOne('#labelN');
+      if (labelNNode) labelNNode.text(`n=${drawN}`);
+      const labelMNode = group.findOne('#labelM');
+      if (labelMNode) labelMNode.text(`m=${drawM}`);
       // Update text content for k label
       const labelKNode = group.findOne('#labelK');
       if (labelKNode) labelKNode.text(`k=${kSnap}`);
