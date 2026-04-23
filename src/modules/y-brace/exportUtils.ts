@@ -225,7 +225,7 @@ function getParamLines(params: CalcParams): string[] {
     `下撑杆截面积 A = ${A} cm²`,
     `下撑杆弱轴方向惯性矩 I = ${I} cm⁴`,
     `下撑杆强轴方向惯性矩 I' = ${IPrime} cm⁴`,
-    `Y撑交点位于斜杆位置 k = ${kSnap}`,
+    `斜杆L₁与L₀的比值 k = ${kSnap}`,
     `下撑杆支座反力 R = ${R} kN`,
     `材料抗压强度设计值 f = ${f} N/mm²`,
   ];

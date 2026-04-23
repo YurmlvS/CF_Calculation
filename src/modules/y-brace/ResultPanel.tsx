@@ -20,13 +20,13 @@ function buildAxisLatex(
   r: YBraceAxisResult,
   params: Record<string, number | ''>,
 ): string {
-  const { n, m, mu, R, I, IPrime, A, k } = params;
+  const { n, m, mu, R, I, IPrime, A, k, f } = params;
   const kVal = k === '' ? 0.5 : Number(k);
   const kSnap = Math.round(Math.min(0.9, Math.max(0.1, kVal)) * 10) / 10;
 
   const safeText = r.isSafe
-    ? '< f \\text{ (满足要求)}'
-    : '\\ge f \\text{ (不满足)}';
+    ? `< f = ${f} \\text{ (满足要求)}`
+    : `\\ge f = ${f} \\text{ (不满足)}`;
 
   if (axis === 'weak') {
     const full = (Number(mu) * Number(n) / r.sin_a).toFixed(1);
@@ -101,11 +101,11 @@ const ResultPanel: React.FC<ModuleResultProps> = ({ params, calcResult, calcTarg
     if (!result) return null;
 
     const buildAxisEquations = (axis: 'weak' | 'strong', r: YBraceAxisResult) => {
-      const { n, m, mu, R, I, IPrime, A, k } = params;
+      const { n, m, mu, R, I, IPrime, A, k, f } = params;
       const kVal = k === '' ? 0.5 : Number(k);
       const kSnap = Math.round(Math.min(0.9, Math.max(0.1, kVal)) * 10) / 10;
 
-      const safeText = r.isSafe ? '< f \\text{ (满足要求)}' : '\\ge f \\text{ (不满足)}';
+      const safeText = r.isSafe ? `< f = ${f} \\text{ (满足要求)}` : `\\ge f = ${f} \\text{ (不满足)}`;
       const eqAngle = `a = \\arctan(n/m) = \\arctan(${n}/${m}) = ${r.a_deg}^\\circ`;
       const eqNx = `N_x = R / \\sin a = ${R} / \\sin ${r.a_deg}^\\circ = ${r.Nx.toFixed(2)}\\text{ kN}`;
       const eqPhi = `\\text{查表取 } \\lambda = ${Math.ceil(r.lambda)} \\rightarrow \\phi = ${r.phi}`;
@@ -237,15 +237,15 @@ const ResultPanel: React.FC<ModuleResultProps> = ({ params, calcResult, calcTarg
               className="list-disc list-inside text-sm text-gray-700 ml-2"
               style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.25rem' }}
             >
-              <li>n = {params.n} mm</li>
-              <li>m = {params.m} mm</li>
-              <li>μ = {params.mu}</li>
-              <li>R (下撑杆件支座力) = {params.R} kN</li>
-              <li>A = {params.A} cm²</li>
-              <li>I (弱轴惯性矩) = {params.I} cm⁴</li>
-              <li>I' (强轴惯性矩) = {params.IPrime} cm⁴</li>
-              <li>k (Y撑交点位置) = {params.k === '' ? 0.5 : params.k}</li>
-              <li>f = {params.f} N/mm²</li>
+              <li>(支撑上下固定点的竖向距离) n = {params.n} mm</li>
+              <li>(支撑上下固定点的水平距离) m = {params.m} mm</li>
+              <li>μ(计算长度系数) = {params.mu}</li>
+              <li>R(下撑杆件支座力) = {params.R} kN</li>
+              <li>A(下撑杆截面积) = {params.A} cm²</li>
+              <li>I(弱轴惯性矩) = {params.I} cm⁴</li>
+              <li>I'(强轴惯性矩) = {params.IPrime} cm⁴</li>
+              <li>k(斜杆L₁与L₀的比值) = {params.k === '' ? 0.5 : params.k}</li>
+              <li>f(材料抗压强度设计值) = {params.f} N/mm²</li>
             </ul>
           ) : (
             <span className="text-xs text-gray-400">等待输入...</span>

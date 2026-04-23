@@ -11,7 +11,7 @@ export const paramFields: ParamFieldDef[] = [
   { key: 'A', label: 'A 下撑杆截面积 (cm²)', placeholder: '例如: 10.24' },
   { key: 'I', label: 'I 下撑杆弱轴方向截面惯性矩 (cm⁴)', placeholder: '例如: 16.6' },
   { key: 'IPrime', label: "I' 下撑杆强轴方向截面惯性矩 (cm⁴)", placeholder: '例如: 101' },
-  { key: 'k', label: 'k Y撑交点位于斜杆位置  0.1~0.9', placeholder: '例如: 0.5' },
+  { key: 'k', label: 'k 斜杆L₁与L₀的比值 取值范围0.1~0.9', placeholder: '例如: 0.5' },
   { key: 'f', label: 'f 材料抗压强度设计值 (N/mm²)', placeholder: '例如: 205' },
 ];
 
