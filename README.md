@@ -327,30 +327,33 @@ curl -X POST http://localhost:7034/api/y-brace/reports/docx \
 当前 Docker 配置会同时部署前端静态页面和 Node.js API 服务：
 
 ```text
-前端页面  http://<服务器IP>:7033
-API 服务  http://<服务器IP>:7035
+前端页面  http://<服务器IP>:7055
+API 服务  http://<服务器IP>:7056
 ```
 
-API 服务需要配置 `API_KEY` 环境变量。
+测试版本的 Docker 部署已在 `docker-compose.yml` 中固定使用 API 密钥：
+
+```text
+test_api
+```
 
 ### 使用 Docker Compose
 
 ```bash
-API_KEY=your-secret-key docker compose up -d --build
+docker compose up -d --build
 ```
 
 Windows PowerShell：
 
 ```powershell
-$env:API_KEY="your-secret-key"
 docker compose up -d --build
 ```
 
 访问：
 
 ```text
-http://<服务器IP>:7033
-http://<服务器IP>:7035/api/health
+http://<服务器IP>:7055
+http://<服务器IP>:7056/api/health
 ```
 
 ### 直接使用 Docker
@@ -369,13 +372,13 @@ docker build --target api -t cf-calculation-api:latest .
 
 ```bash
 docker run -d --name cf-calculation-web \
-  -p 7033:7033 \
+  -p 7055:7055 \
   --restart unless-stopped \
   cf-calculation-web:latest
 
 docker run -d --name cf-calculation-api \
-  -p 7035:7035 \
-  -e API_KEY=your-secret-key \
+  -p 7056:7056 \
+  -e API_KEY=test_api \
   --restart unless-stopped \
   cf-calculation-api:latest
 ```
