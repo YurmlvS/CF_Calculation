@@ -2,6 +2,18 @@
  * 直角三角形模块 —— 导出工具
  */
 
+function formatExportTimestamp(date = new Date()): string {
+  const pad = (value: number) => String(value).padStart(2, '0');
+
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+    pad(date.getHours()),
+    pad(date.getMinutes()),
+  ].join('');
+}
+
 function ensureHtml2Pdf(): Promise<void> {
   return new Promise((resolve, reject) => {
     if (window.html2pdf) {
@@ -64,7 +76,7 @@ export async function exportToPDF(calcResult: any): Promise<void> {
 
   const opt = {
     margin: [12, 15, 12, 15],
-    filename: `直角三角形计算书_${Date.now()}.pdf`,
+    filename: `直角三角形计算书_${formatExportTimestamp()}.pdf`,
     image: { type: 'jpeg', quality: 0.98 },
     html2canvas: {
       scale: 2,
@@ -133,7 +145,7 @@ export function exportToWord(calcResult: any): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `直角三角形计算书_${Date.now()}.doc`;
+  link.download = `直角三角形计算书_${formatExportTimestamp()}.doc`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

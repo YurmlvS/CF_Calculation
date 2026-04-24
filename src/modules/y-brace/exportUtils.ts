@@ -39,6 +39,18 @@ type MathPart = string | MathComponent | readonly MathComponent[];
 
 const LAMBDA_LIMIT = 200;
 
+function formatExportTimestamp(date = new Date()): string {
+  const pad = (value: number) => String(value).padStart(2, '0');
+
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+    pad(date.getHours()),
+    pad(date.getMinutes()),
+  ].join('');
+}
+
 function isLambdaSafe(r: YBraceAxisResult): boolean {
   return r.lambda < LAMBDA_LIMIT;
 }
@@ -566,7 +578,7 @@ export async function exportToWord(
 
   const doc = createDoc(buildCommonDocumentChildren(calcResult, paramParagraphs, calcSections));
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, `Y撑验算书_${Date.now()}.docx`);
+  saveAs(blob, `Y撑验算书_${formatExportTimestamp()}.docx`);
 }
 
 export async function exportToLaTeX(
@@ -596,7 +608,7 @@ export async function exportToLaTeX(
 
   const doc = createDoc(buildCommonDocumentChildren(calcResult, paramParagraphs, calcSections));
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, `Y撑验算书_LaTeX版_${Date.now()}.docx`);
+  saveAs(blob, `Y撑验算书_LaTeX版_${formatExportTimestamp()}.docx`);
 }
 
 function ensureHtml2Pdf(): Promise<void> {
@@ -650,7 +662,7 @@ export async function exportToPDF(calcResult: YBraceResult | null): Promise<void
 
   const opt = {
     margin: [12, 15, 12, 15],
-    filename: `Y撑验算书_${Date.now()}.pdf`,
+    filename: `Y撑验算书_${formatExportTimestamp()}.pdf`,
     image: { type: 'jpeg', quality: 0.98 },
     html2canvas: { scale: 2, useCORS: true, logging: false },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
