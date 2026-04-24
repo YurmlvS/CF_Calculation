@@ -162,7 +162,7 @@ body {
 }
 
 .text-xl {
-  font-size: 1.4375rem;
+  font-size: 1.4rem;
   /* 原 1.25rem → 约 +15% */
   line-height: 2rem;
 }
