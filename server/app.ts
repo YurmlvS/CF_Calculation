@@ -140,7 +140,7 @@ export function createApp() {
         return;
       }
 
-      const buffer = await buildYBraceDocxBuffer(response.body.report);
+      const buffer = await buildYBraceDocxBuffer(response.body.normalizedParams, response.body.result);
       const fileName = encodeURIComponent(`Y撑复核验算书_${formatTimestampForFile()}.docx`);
 
       res.setHeader('Content-Type', DOCX_CONTENT_TYPE);
