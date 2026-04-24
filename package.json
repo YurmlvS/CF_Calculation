@@ -5,24 +5,32 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "api:dev": "tsx server/index.ts",
+    "api:build": "tsc -p tsconfig.server.json",
+    "api:start": "node dist-server/server/index.js",
+    "api:test": "npm run api:build && node dist-server/server/__tests__/yBrace.test.js",
     "preview": "vite preview",
     "tauri": "tauri"
   },
   "dependencies": {
     "docx": "^9.6.1",
+    "express": "^5.2.1",
     "file-saver": "^2.0.5",
     "html-to-docx": "^1.8.0",
     "katex": "^0.16.9",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0",
+    "@types/express": "^5.0.6",
     "@types/file-saver": "^2.0.7",
     "@types/katex": "^0.16.7",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.1",
+    "tsx": "^4.21.0",
     "typescript": "^5.5.3",
     "vite": "^5.4.0"
   }
