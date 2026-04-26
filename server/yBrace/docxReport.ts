@@ -124,9 +124,9 @@ function parameterParagraphs(params: YBraceParams): Paragraph[] {
 }
 
 function createDiagramSvg(params: YBraceParams): Buffer {
-  const width = 520;
-  const height = 620;
-  const padding = 110;
+  const width = 400;
+  const height = 600;
+  const padding = 75;
   const n = params.n || 4800;
   const m = params.m || 2144;
   const k = snappedK(params);
@@ -141,32 +141,58 @@ function createDiagramSvg(params: YBraceParams): Buffer {
   const bottomY = cy + scaledN;
   const kX = bottomX + k * scaledM;
   const kY = bottomY - k * scaledN;
+  const diagonalDimOffset = 30;
+  const diagonalTickHalfLength = 7;
+  const getDiagonalDimension = (x1: number, y1: number, x2: number, y2: number) => {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const length = Math.hypot(dx, dy) || 1;
+    const normalX = -dy / length;
+    const normalY = dx / length;
+    const dimX1 = x1 + diagonalDimOffset;
+    const dimY1 = y1 + diagonalDimOffset;
+    const dimX2 = x2 + diagonalDimOffset;
+    const dimY2 = y2 + diagonalDimOffset;
+    const tickX = normalX * diagonalTickHalfLength;
+    const tickY = normalY * diagonalTickHalfLength;
+
+    return {
+      line: { x1: dimX1, y1: dimY1, x2: dimX2, y2: dimY2 },
+      tick1: { x1: dimX1 - tickX, y1: dimY1 - tickY, x2: dimX1 + tickX, y2: dimY1 + tickY },
+      tick2: { x1: dimX2 - tickX, y1: dimY2 - tickY, x2: dimX2 + tickX, y2: dimY2 + tickY },
+      label: {
+        x: (dimX1 + dimX2) / 2 + 8,
+        y: (dimY1 + dimY2) / 2 + 8,
+        rotation: (Math.atan2(dy, dx) * 180) / Math.PI,
+      },
+    };
+  };
+  const dimL0 = getDiagonalDimension(cx + 15, bottomY - 5, cx + 15 + scaledM, cy - 5);
+  const dimL1 = getDiagonalDimension(cx - 10, bottomY - 15, kX - 10, kY - 15);
 
   return Buffer.from(`
-<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-  <rect width="100%" height="100%" fill="#f8fafc"/>
-  <defs>
-    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#e5e7eb" stroke-width="1"/>
-    </pattern>
-  </defs>
-  <rect width="100%" height="100%" fill="url(#grid)"/>
-  <text x="24" y="36" font-family="SimSun, Arial" font-size="18" font-weight="700" fill="#1f2937">Y撑支护示意图</text>
-  <line x1="${cx}" y1="${cy}" x2="${cx}" y2="${bottomY + 40}" stroke="#4b5563" stroke-width="4"/>
-  <line x1="${cx}" y1="${cy}" x2="${braceX + 40}" y2="${braceY}" stroke="#4b5563" stroke-width="4"/>
-  <line x1="${bottomX}" y1="${bottomY}" x2="${braceX}" y2="${braceY}" stroke="#DC2915" stroke-width="4" stroke-linecap="round"/>
-  <line x1="${cx}" y1="${cy}" x2="${kX}" y2="${kY}" stroke="#DC2915" stroke-width="4" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" overflow="visible">
+  <line x1="${cx}" y1="${cy}" x2="${cx}" y2="${bottomY + 40}" stroke="#4b5563" stroke-width="3" stroke-linecap="square"/>
+  <line x1="${cx}" y1="${cy}" x2="${braceX + 40}" y2="${braceY}" stroke="#4b5563" stroke-width="3" stroke-linecap="square"/>
+  <line x1="${bottomX}" y1="${bottomY}" x2="${braceX}" y2="${braceY}" stroke="#DC2915" stroke-width="3" stroke-linecap="round"/>
+  <line x1="${cx}" y1="${cy}" x2="${kX}" y2="${kY}" stroke="#DC2915" stroke-width="3" stroke-linecap="square"/>
   <line x1="${cx - 30}" y1="${cy}" x2="${cx - 30}" y2="${bottomY}" stroke="#9ca3af" stroke-width="2"/>
   <line x1="${cx - 36}" y1="${cy}" x2="${cx - 24}" y2="${cy}" stroke="#9ca3af" stroke-width="2"/>
   <line x1="${cx - 36}" y1="${bottomY}" x2="${cx - 24}" y2="${bottomY}" stroke="#9ca3af" stroke-width="2"/>
   <line x1="${cx}" y1="${cy - 30}" x2="${braceX}" y2="${cy - 30}" stroke="#9ca3af" stroke-width="2"/>
   <line x1="${cx}" y1="${cy - 36}" x2="${cx}" y2="${cy - 24}" stroke="#9ca3af" stroke-width="2"/>
   <line x1="${braceX}" y1="${cy - 36}" x2="${braceX}" y2="${cy - 24}" stroke="#9ca3af" stroke-width="2"/>
+  <line id="dimLineL0" x1="${dimL0.line.x1}" y1="${dimL0.line.y1}" x2="${dimL0.line.x2}" y2="${dimL0.line.y2}" stroke="#9ca3af" stroke-width="2"/>
+  <line id="tickL01" x1="${dimL0.tick1.x1}" y1="${dimL0.tick1.y1}" x2="${dimL0.tick1.x2}" y2="${dimL0.tick1.y2}" stroke="#9ca3af" stroke-width="2"/>
+  <line id="tickL02" x1="${dimL0.tick2.x1}" y1="${dimL0.tick2.y1}" x2="${dimL0.tick2.x2}" y2="${dimL0.tick2.y2}" stroke="#9ca3af" stroke-width="2"/>
+  <line id="dimLineL1" x1="${dimL1.line.x1}" y1="${dimL1.line.y1}" x2="${dimL1.line.x2}" y2="${dimL1.line.y2}" stroke="#9ca3af" stroke-width="2"/>
+  <line id="tickL11" x1="${dimL1.tick1.x1}" y1="${dimL1.tick1.y1}" x2="${dimL1.tick1.x2}" y2="${dimL1.tick1.y2}" stroke="#9ca3af" stroke-width="2"/>
+  <line id="tickL12" x1="${dimL1.tick2.x1}" y1="${dimL1.tick2.y1}" x2="${dimL1.tick2.x2}" y2="${dimL1.tick2.y2}" stroke="#9ca3af" stroke-width="2"/>
   <text x="${cx - 55}" y="${cy + scaledN / 2}" font-family="Arial" font-size="18" font-weight="700" fill="#374151" transform="rotate(-90 ${cx - 55} ${cy + scaledN / 2})">n=${n}</text>
   <text x="${cx + scaledM / 2 - 30}" y="${cy - 46}" font-family="Arial" font-size="18" font-weight="700" fill="#374151">m=${m}</text>
   <text x="${kX + 8}" y="${kY + 18}" font-family="Arial" font-size="16" font-weight="700" fill="#1d4ed8">k=${k}</text>
-  <text x="${(bottomX + braceX) / 2 + 28}" y="${(bottomY + braceY) / 2 + 24}" font-family="Arial" font-size="17" font-weight="700" fill="#374151">L0</text>
-  <text x="${(cx + kX) / 2 + 18}" y="${(cy + kY) / 2 - 16}" font-family="Arial" font-size="17" font-weight="700" fill="#374151">L1</text>
+  <text id="labelL0" x="${dimL0.label.x}" y="${dimL0.label.y}" font-family="Arial" font-size="17" font-weight="700" fill="#374151" transform="rotate(${dimL0.label.rotation} ${dimL0.label.x} ${dimL0.label.y})">L0</text>
+  <text id="labelL1" x="${dimL1.label.x}" y="${dimL1.label.y}" font-family="Arial" font-size="17" font-weight="700" fill="#374151" transform="rotate(${dimL1.label.rotation} ${dimL1.label.x} ${dimL1.label.y})">L1</text>
 </svg>`.trim());
 }
 
@@ -180,7 +206,7 @@ function diagramParagraph(params: YBraceParams): Paragraph {
           type: 'png',
           data: TRANSPARENT_PNG_1X1,
         },
-        transformation: { width: 400, height: 477 },
+        transformation: { width: 400, height: 600 },
         altText: {
           title: 'Y撑支护示意图',
           description: '根据 n、m、k 参数生成的 Y 撑支护示意图',
