@@ -1,6 +1,7 @@
 /**
  * 直角三角形模块 —— 核心计算逻辑（勾股定理）
  */
+import { ParamValue } from '../types';
 
 export interface TriangleResult {
   /** 直角边 a */
@@ -23,7 +24,7 @@ export interface TriangleResult {
  * 计算函数
  */
 export function calculate(
-  params: Record<string, number | ''>,
+  params: Record<string, ParamValue>,
   _calcTarget: string,
 ): TriangleResult | null {
   const { a, b } = params;

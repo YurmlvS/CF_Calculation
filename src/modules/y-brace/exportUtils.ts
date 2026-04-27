@@ -18,6 +18,7 @@ import {
 } from 'docx';
 import { saveAs } from 'file-saver';
 import { YBraceAxisResult, YBraceResult } from './calculate';
+import { ParamValue } from '../types';
 
 const FONT_SIZES = {
   TITLE: 44,
@@ -33,7 +34,7 @@ const FONTS = {
   MATH: 'Cambria Math',
 };
 
-type CalcParams = Record<string, number | ''>;
+type CalcParams = Record<string, ParamValue>;
 type Axis = 'weak' | 'strong';
 type MathPart = string | MathComponent | readonly MathComponent[];
 
@@ -330,7 +331,7 @@ function buildAxisParagraphs(axis: Axis, r: YBraceAxisResult, params: CalcParams
   return paras;
 }
 
-function buildAngleMath(n: number | '', m: number | '', angleDeg: string): MathComponent[] {
+function buildAngleMath(n: ParamValue, m: ParamValue, angleDeg: string): MathComponent[] {
   return mathSeq(
     'a = ',
     mathFunc('arctan', [mathParen([mathFrac([mathRun('n')], [mathRun('m')])])]),
@@ -340,7 +341,7 @@ function buildAngleMath(n: number | '', m: number | '', angleDeg: string): MathC
   );
 }
 
-function buildNxMath(supportForce: number | '', angleDeg: string, nxValue: number): MathComponent[] {
+function buildNxMath(supportForce: ParamValue, angleDeg: string, nxValue: number): MathComponent[] {
   return mathSeq(
     mathSub('N', 'x'),
     ' = ',
@@ -357,7 +358,7 @@ function buildPhiMath(lambdaValue: number, phiValue: number | string): MathCompo
 
 function buildSigmaMath(
   nxValue: number,
-  area: number | '',
+  area: ParamValue,
   phiValue: number | string,
   sigmaValue: number,
   isSafe: boolean,
@@ -373,7 +374,7 @@ function buildSigmaMath(
   );
 }
 
-function buildWeakH0Math(mu: number | '', n: number | '', sinA: number, h0Value: number, kSnap: number): MathComponent[] {
+function buildWeakH0Math(mu: ParamValue, n: ParamValue, sinA: number, h0Value: number, kSnap: number): MathComponent[] {
   const full = (Number(mu) * Number(n) / sinA).toFixed(1);
   const otherK = (1 - kSnap).toFixed(1);
 
@@ -392,7 +393,7 @@ function buildWeakH0Math(mu: number | '', n: number | '', sinA: number, h0Value:
   );
 }
 
-function buildStrongH0Math(mu: number | '', n: number | '', angleDeg: string, h0Value: number): MathComponent[] {
+function buildStrongH0Math(mu: ParamValue, n: ParamValue, angleDeg: string, h0Value: number): MathComponent[] {
   return mathSeq(
     mathSub('h', '0'),
     "' = ",
@@ -401,7 +402,7 @@ function buildStrongH0Math(mu: number | '', n: number | '', angleDeg: string, h0
   );
 }
 
-function buildWeakIMath(moment: number | '', area: number | '', iValue: number): MathComponent[] {
+function buildWeakIMath(moment: ParamValue, area: ParamValue, iValue: number): MathComponent[] {
   return mathSeq(
     'i = ',
     mathSqrt([mathFrac([mathRun('I')], [mathRun('A')])]),
@@ -411,7 +412,7 @@ function buildWeakIMath(moment: number | '', area: number | '', iValue: number):
   );
 }
 
-function buildStrongIMath(momentPrime: number | '', area: number | '', iValue: number): MathComponent[] {
+function buildStrongIMath(momentPrime: ParamValue, area: ParamValue, iValue: number): MathComponent[] {
   return mathSeq(
     "i' = ",
     mathSqrt([mathFrac([mathRun("I'")], [mathRun('A')])]),

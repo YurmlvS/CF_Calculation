@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useMemo } from 'react';
 import katex from 'katex';
-import { ModuleResultProps } from '../types';
+import { ModuleResultProps, ParamValue } from '../types';
 import { YBraceResult, YBraceAxisResult } from './calculate';
 
 const safeRenderKatex = (tex: string) => {
@@ -28,7 +28,7 @@ const buildLambdaRequirementText = (r: YBraceAxisResult) =>
 function buildAxisLatex(
   axis: 'weak' | 'strong',
   r: YBraceAxisResult,
-  params: Record<string, number | ''>,
+  params: Record<string, ParamValue>,
 ): string {
   const { n, m, mu, R, I, IPrime, A, k, f } = params;
   const kVal = k === '' ? 0.5 : Number(k);
