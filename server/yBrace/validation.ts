@@ -1,11 +1,13 @@
 import { z } from 'zod';
 import { yBraceDefaultCalcTarget, type YBraceCalcTarget } from './schema';
+import { braceMaterialSpecs } from '../../src/modules/y-brace/materials';
 
 export type YBraceParams = {
   n: number;
   m: number;
   mu: number;
   R: number;
+  materialSpec: string;
   A: number;
   I: number | '';
   IPrime: number | '';
@@ -35,6 +37,8 @@ const requestSchema = z.object({
 });
 
 const baseRequiredFields = ['n', 'm', 'mu', 'R', 'A', 'f'] as const;
+const materialSpecMap = new Map(braceMaterialSpecs.map((item) => [item.spec, item]));
+const allowedFValues = new Set([205, 295]);
 
 function requiredMomentFields(calcTarget: YBraceCalcTarget): Array<'I' | 'IPrime'> {
   if (calcTarget === 'weak') return ['I'];
@@ -111,6 +115,44 @@ function readK(params: Record<string, unknown>, issues: ValidationIssue[]): numb
   return numberValue;
 }
 
+function readMaterialSpec(params: Record<string, unknown>, issues: ValidationIssue[]): string {
+  const value = params.materialSpec;
+
+  if (value === undefined || value === null || value === '') {
+    return 'custom';
+  }
+
+  const spec = String(value);
+  if (spec === 'custom' || materialSpecMap.has(spec)) {
+    return spec;
+  }
+
+  issues.push({
+    field: 'params.materialSpec',
+    code: 'invalid_option',
+    message: 'materialSpec 必须是材料库中的规格或 custom',
+  });
+  return 'custom';
+}
+
+function readMaterialStrength(params: Record<string, unknown>, issues: ValidationIssue[]): number | '' {
+  if (params.f === 'Q235') return 205;
+  if (params.f === 'Q355') return 295;
+
+  const value = readPositiveNumber(params, 'f', baseRequiredFields.includes('f'), issues);
+  if (value === '') return value;
+
+  if (!allowedFValues.has(value)) {
+    issues.push({
+      field: 'params.f',
+      code: 'invalid_option',
+      message: 'f 只允许 Q235=205 或 Q355=295',
+    });
+  }
+
+  return value;
+}
+
 export function validateYBraceRequest(body: unknown): ValidationResult {
   const parsed = requestSchema.safeParse(body);
 
@@ -130,17 +172,20 @@ export function validateYBraceRequest(body: unknown): ValidationResult {
   const { calcTarget, params } = parsed.data;
   const issues: ValidationIssue[] = [];
   const momentFields = requiredMomentFields(calcTarget);
+  const materialSpec = readMaterialSpec(params, issues);
+  const selectedMaterial = materialSpec === 'custom' ? undefined : materialSpecMap.get(materialSpec);
 
   const normalized = {
     n: readPositiveNumber(params, 'n', baseRequiredFields.includes('n'), issues),
     m: readPositiveNumber(params, 'm', baseRequiredFields.includes('m'), issues),
     mu: readPositiveNumber(params, 'mu', baseRequiredFields.includes('mu'), issues),
     R: readPositiveNumber(params, 'R', baseRequiredFields.includes('R'), issues),
-    A: readPositiveNumber(params, 'A', baseRequiredFields.includes('A'), issues),
-    I: readPositiveNumber(params, 'I', momentFields.includes('I'), issues),
-    IPrime: readPositiveNumber(params, 'IPrime', momentFields.includes('IPrime'), issues),
+    materialSpec,
+    A: selectedMaterial?.A ?? readPositiveNumber(params, 'A', baseRequiredFields.includes('A'), issues),
+    I: selectedMaterial?.I ?? readPositiveNumber(params, 'I', momentFields.includes('I'), issues),
+    IPrime: selectedMaterial?.IPrime ?? readPositiveNumber(params, 'IPrime', momentFields.includes('IPrime'), issues),
     k: readK(params, issues),
-    f: readPositiveNumber(params, 'f', baseRequiredFields.includes('f'), issues),
+    f: readMaterialStrength(params, issues),
   };
 
   if (issues.length > 0) {

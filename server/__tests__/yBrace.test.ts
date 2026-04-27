@@ -72,6 +72,56 @@ test('calculates y_brace for both axes', async () => {
   assert.equal(body.report.sections.length, 2);
 });
 
+test('schema exposes material and strength select options', async () => {
+  const response = await fetch(`${baseUrl}/api/y-brace/schema`, {
+    headers: { 'x-api-key': apiKey },
+  });
+
+  const body = await response.json() as any;
+  const materialField = body.paramFields.find((field: any) => field.key === 'materialSpec');
+  const strengthField = body.paramFields.find((field: any) => field.key === 'f');
+
+  assert.equal(response.status, 200);
+  assert.equal(materialField.inputType, 'select');
+  assert.ok(materialField.options.some((option: any) => option.value === 'φ48X2.4'));
+  assert.ok(materialField.options.some((option: any) => option.value === 'custom'));
+  assert.deepEqual(strengthField.options, [
+    { value: 205, label: 'Q235' },
+    { value: 295, label: 'Q355' },
+  ]);
+});
+
+test('calculates y_brace by material specification', async () => {
+  const response = await fetch(`${baseUrl}/api/y-brace/calculate`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': apiKey,
+    },
+    body: JSON.stringify({
+      calcTarget: 'both',
+      params: {
+        n: 4800,
+        m: 2144,
+        mu: 1,
+        R: 25.151,
+        materialSpec: '8号槽钢',
+        k: 0.5,
+        f: 'Q355',
+      },
+    }),
+  });
+
+  const body = await response.json() as any;
+
+  assert.equal(response.status, 200);
+  assert.equal(body.normalizedParams.materialSpec, '8号槽钢');
+  assert.equal(body.normalizedParams.A, 10.24);
+  assert.equal(body.normalizedParams.I, 101);
+  assert.equal(body.normalizedParams.IPrime, 16.6);
+  assert.equal(body.normalizedParams.f, 295);
+});
+
 test('returns detailed validation issues', async () => {
   const response = await fetch(`${baseUrl}/api/y-brace/calculate`, {
     method: 'POST',
@@ -93,6 +143,26 @@ test('returns detailed validation issues', async () => {
   assert.ok(body.error.issues.some((issue: any) => issue.field === 'params.n'));
   assert.ok(body.error.issues.some((issue: any) => issue.field === 'params.IPrime'));
   assert.ok(body.error.issues.some((issue: any) => issue.field === 'params.k'));
+});
+
+test('rejects invalid material specification and strength option', async () => {
+  const response = await fetch(`${baseUrl}/api/y-brace/calculate`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': apiKey,
+    },
+    body: JSON.stringify({
+      calcTarget: 'weak',
+      params: { ...validPayload.params, materialSpec: '不存在的规格', f: 300 },
+    }),
+  });
+
+  const body = await response.json() as any;
+
+  assert.equal(response.status, 400);
+  assert.ok(body.error.issues.some((issue: any) => issue.field === 'params.materialSpec'));
+  assert.ok(body.error.issues.some((issue: any) => issue.field === 'params.f'));
 });
 
 test('returns a docx report as binary content', async () => {

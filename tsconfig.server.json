@@ -16,6 +16,7 @@
   "include": [
     "server/**/*.ts",
     "src/modules/y-brace/calculate.ts",
+    "src/modules/y-brace/materials.ts",
     "src/modules/y-brace/phiUtils.ts",
     "src/modules/y-brace/phiTable.ts"
   ]

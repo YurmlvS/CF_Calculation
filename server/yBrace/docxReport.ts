@@ -114,6 +114,7 @@ function parameterParagraphs(params: YBraceParams): Paragraph[] {
     paragraph(`支撑上下固定点的竖向距离 n = ${params.n} mm`),
     paragraph(`支撑上下固定点的水平距离 m = ${params.m} mm`),
     paragraph(`计算长度系数 μ = ${params.mu}`),
+    paragraph(`材料规格 = ${params.materialSpec === 'custom' ? '自定义' : params.materialSpec}`),
     paragraph(`下撑杆截面积 A = ${params.A} cm²`),
     paragraph(`下撑杆弱轴方向截面惯性矩 I = ${params.I} cm⁴`),
     paragraph(`下撑杆强轴方向截面惯性矩 I' = ${params.IPrime} cm⁴`),

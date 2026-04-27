@@ -38,6 +38,7 @@ function buildParameterLines(params: YBraceParams): string[] {
     `支撑件上下固定点的水平距离 m = ${params.m} mm`,
     `计算长度系数 μ = ${params.mu}`,
     `下撑杆支座力 R = ${params.R} kN`,
+    `材料规格 = ${params.materialSpec === 'custom' ? '自定义' : params.materialSpec}`,
     `下撑杆截面积 A = ${params.A} cm²`,
     `下撑杆弱轴方向截面惯性矩 I = ${params.I === '' ? '-' : params.I} cm⁴`,
     `下撑杆强轴方向截面惯性矩 I' = ${params.IPrime === '' ? '-' : params.IPrime} cm⁴`,
