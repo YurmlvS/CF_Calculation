@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-server/
 src-tauri/target/
 *.local
 .env

@@ -1,15 +1,37 @@
 services:
-  cf-calculation:
+  cf-calculation-web:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: cf-calculation
+      target: frontend
+    container_name: cf-calculation-web
     ports:
-      - "7033:7033"
+      - "7055:7055"
     read_only: true
     tmpfs:
       - /tmp
       - /var/cache/nginx
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+
+  cf-calculation-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    container_name: cf-calculation-api
+    environment:
+      API_HOST: 0.0.0.0
+      API_PORT: 7056
+      API_KEY: test_api
+    ports:
+      - "7056:7056"
+    read_only: true
+    tmpfs:
+      - /tmp
     security_opt:
       - no-new-privileges:true
     cap_drop:
