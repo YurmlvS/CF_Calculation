@@ -217,7 +217,7 @@ const DiagramPanel: React.FC<ModuleDiagramProps> = ({ params, isKonvaLoaded }) =
       }}
     >
       <div className="absolute top-4 left-4 bg-white/80 backdrop-blur px-3 py-1 rounded shadow text-sm font-semibold text-gray-800 z-10 border border-gray-200">
-        结构梁双向受力示意图
+        结构梁双向受力示意图（图形显示暂时有误，不影响计算）
       </div>
       <div ref={konvaContainerRef} className="flex-1 w-full cursor-crosshair" style={{ minHeight: 0 }} />
     </div>
