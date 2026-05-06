@@ -178,7 +178,7 @@ const DiagramPanel: React.FC<ModuleDiagramProps> = ({ params, isKonvaLoaded }) =
       }}
     >
       <div className="absolute top-4 left-4 bg-white/80 backdrop-blur px-3 py-1 rounded shadow text-st font-semibold text-gray-800 z-10 border border-gray-200">
-        Y撑支护示意图 (Y-Brace Support Diagram)
+        Y撑支护示意图
       </div>
       <div ref={konvaContainerRef} className="flex-1 w-full cursor-crosshair" style={{ minHeight: 0 }} />
     </div>

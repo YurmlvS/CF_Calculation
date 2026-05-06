@@ -1,214 +1,406 @@
 # CF_Calculation
 
-结构力学计算工具集，支持按模块切换不同计算方案。项目基于 `React 18 + TypeScript + Vite 5 + Tauri 2` 构建，适合在浏览器中调试，也可以打包为桌面应用。
-
-当前内置模块：
-
-- `y_brace`：Y 撑复核验算
-- `triangle`：直角三角形勾股定理计算
+结构力学计算工具集，当前基于 `React 18 + TypeScript + Vite 5 + Tauri 2` 构建，同时新增了独立的 Node.js API 服务。项目既可以作为浏览器/桌面计算工具使用，也可以通过 HTTP API 接收用户数据并返回计算结果或 Word 报告。
 
 ## 功能概览
 
-- 支持多计算模块统一注册、切换和渲染
-- 支持 Konva 绘制结构示意图
-- 支持 KaTeX 渲染计算结果中的数学公式
-- 支持导出 Word 与 PDF 报告
-- `y_brace` 模块额外支持“导出 KaTeX 版” `.docx`
-  说明：当前实现已改为使用 `docx` 的 Word 原生公式对象导出，不再把公式截图为图片嵌入
-
-## 技术栈
-
-- 前端：`React 18`、`TypeScript`、`Vite 5`
-- 桌面壳：`Tauri 2`
-- 文档导出：`docx`、`file-saver`、`html2pdf.js`
-- 公式渲染：`KaTeX`
-- 图形绘制：`Konva.js`
-
-## 快速开始
-
-### 1. 安装依赖
-
-```bash
-npm install
-```
-
-### 2. 启动前端开发环境
-
-```bash
-npm run dev
-```
-
-### 3. 启动 Tauri 桌面开发环境
-
-需要本地安装 Rust/Cargo。
-
-```bash
-npm run tauri dev
-```
-
-### 4. 构建项目
-
-```bash
-npm run build
-```
-
-### 5. 构建桌面应用
-
-```bash
-npm run tauri build
-```
-
-## Docker 部署到 Ubuntu
-
-如果你的目标是在 Ubuntu 服务器上通过 Docker 部署这个项目，当前仓库已经包含可直接使用的：
-
-- `Dockerfile`
-- `docker/nginx.conf`
-- `docker-compose.yml`
-
-部署后容器内部和宿主机都使用 `7033` 端口。
-当前运行时镜像使用非 root 的 Nginx 版本，并在 `docker-compose.yml` 中启用了只读根文件系统、`tmpfs` 临时目录和 `no-new-privileges` 等安全限制。
-
-### 方式一：直接用 Docker
-
-```bash
-docker build -t cf-calculation:latest .
-docker run -d --name cf-calculation -p 7033:7033 --restart unless-stopped cf-calculation:latest
-```
-
-启动完成后访问：
-
-```text
-http://<你的Ubuntu服务器IP>:7033
-```
-
-### 方式二：使用 Docker Compose
-
-```bash
-docker compose up -d --build
-```
-
-同样会暴露：
-
-```text
-http://<你的Ubuntu服务器IP>:7033
-```
-
-### 停止与重启
-
-```bash
-docker compose down
-docker compose up -d
-```
-
-或如果你使用的是 `docker run`：
-
-```bash
-docker stop cf-calculation
-docker start cf-calculation
-```
-
-## 环境要求
-
-| 工具 | 建议版本 |
-| --- | --- |
-| Node.js | 18+ |
-| npm | 9+ |
-| Rust / Cargo | stable |
-| Tauri CLI | 已包含在 `devDependencies` 中 |
+- 前端计算界面：支持模块切换、参数输入、结构示意图、计算结果展示。
+- 桌面应用：通过 Tauri 2 打包为本地桌面应用。
+- 计算模块：
+  - `y_brace`：Y 撑复核验算。
+  - `triangle`：直角三角形勾股定理计算。
+- 报告导出：
+  - 前端支持模块自带的 Word/PDF 导出能力。
+  - API 第一版仅支持 `y_brace`，返回 JSON 结果和 `.docx` Word 报告，不提供 PDF。
+- API 服务：
+  - 基于 Express。
+  - 使用 `x-api-key` 做简单鉴权。
+  - 使用 zod/自定义校验返回字段级错误。
 
 ## 项目结构
 
 ```text
 CF_Calculation/
-├─ index.html
-├─ package.json
-├─ vite.config.ts
-├─ tsconfig.json
-├─ src/
-│  ├─ main.tsx
+├─ src/                         # 前端应用与通用计算模块
 │  ├─ App.tsx
-│  ├─ components/
-│  │  ├─ Navbar.tsx
-│  │  ├─ DiagramPanel.tsx
-│  │  ├─ ParamsPanel.tsx
-│  │  └─ ResultPanel.tsx
-│  ├─ constants/
-│  ├─ types/
-│  ├─ utils/
-│  └─ modules/
-│     ├─ index.ts
-│     ├─ types.ts
-│     ├─ y-brace/
-│     │  ├─ index.ts
-│     │  ├─ params.ts
-│     │  ├─ calculate.ts
-│     │  ├─ DiagramPanel.tsx
-│     │  ├─ ResultPanel.tsx
-│     │  └─ exportUtils.ts
-│     └─ triangle/
-│        ├─ index.ts
-│        ├─ params.ts
-│        ├─ calculate.ts
-│        ├─ DiagramPanel.tsx
-│        ├─ ResultPanel.tsx
-│        └─ exportUtils.ts
-└─ src-tauri/
-   ├─ tauri.conf.json
-   ├─ Cargo.toml
-   └─ src/
+│  ├─ components/               # 前端通用组件
+│  ├─ modules/                  # 计算模块注册与具体模块
+│  │  ├─ index.ts               # 模块注册表
+│  │  ├─ types.ts               # 统一模块接口
+│  │  ├─ y-brace/               # Y 撑计算、前端结果、前端导出
+│  │  └─ triangle/              # 三角形计算、前端结果、前端导出
+│  └─ utils/
+├─ server/                      # Node.js API 服务
+│  ├─ index.ts                  # API 启动入口
+│  ├─ app.ts                    # Express app、鉴权、路由
+│  ├─ yBrace/
+│  │  ├─ schema.ts              # API 对外 schema 元信息
+│  │  ├─ validation.ts          # 请求参数校验
+│  │  ├─ report.ts              # JSON 报告文本结构
+│  │  └─ docxReport.ts          # 服务端 Word 报告生成
+│  └─ __tests__/                # API 测试
+├─ src-tauri/                   # Tauri 桌面应用配置与 Rust 入口
+├─ docker/                      # Nginx 静态部署配置
+├─ Dockerfile
+├─ docker-compose.yml
+├─ package.json
+├─ tsconfig.json                # 前端 TypeScript 配置
+└─ tsconfig.server.json         # API TypeScript 配置
 ```
 
-## 架构说明
+## 安装依赖
 
-项目采用模块化注册架构，`App.tsx` 不直接耦合具体计算逻辑，而是通过模块接口动态分发：
+```bash
+npm install
+```
 
-1. `src/modules/types.ts` 定义统一的 `CalcModule` 接口
-2. 每个模块目录各自维护参数定义、计算逻辑、绘图组件、结果组件和导出逻辑
-3. `src/modules/index.ts` 负责注册全部模块
-4. `App.tsx` 根据当前模块动态渲染对应的 `DiagramPanel`、`ResultPanel` 和导出能力
+建议使用 Node.js 18+。
 
-这样做的好处是：
+## 前端开发与构建
 
-- 新增模块时对现有模块影响小
-- 计算逻辑与 UI 逻辑边界清晰
-- 各模块可以拥有自己的导出实现
+启动浏览器开发环境：
 
-## 导出说明
+```bash
+npm run dev
+```
 
-### Word 导出
+构建前端静态资源：
 
-- 各模块均可导出普通 Word 报告
-- `y_brace` 的“导出 KaTeX 版”会生成 `.docx`
-- 该版本中的公式使用 Word 原生公式对象，便于后续在 Word 中继续编辑
+```bash
+npm run build
+```
 
-### PDF 导出
+预览构建产物：
 
-- PDF 导出依赖运行时动态加载 `html2pdf.js`
-- 导出内容基于页面结果区渲染
+```bash
+npm run preview
+```
 
-## 模块扩展
+启动 Tauri 桌面开发环境：
 
-新增一个计算模块时，推荐按下面步骤进行：
+```bash
+npm run tauri dev
+```
 
-1. 在 `src/modules/` 下创建新目录，例如 `src/modules/my-module/`
-2. 实现本模块的：
-   `params.ts`、`calculate.ts`、`DiagramPanel.tsx`、`ResultPanel.tsx`、`exportUtils.ts`、`index.ts`
-3. 在 `src/modules/index.ts` 中导入并注册该模块
-4. 保持模块默认导出符合 `CalcModule` 接口
+构建桌面应用：
 
-完成后，模块会自动接入主界面的模块切换流程。
+```bash
+npm run tauri build
+```
+
+## API 服务用法
+
+API 是独立的 Node.js 服务，不依赖浏览器 DOM，也不会启动 Tauri。第一版只开放 `y_brace` 模块。
+
+### 启动 API
+
+PowerShell 示例：
+
+```powershell
+$env:API_KEY="your-secret-key"
+npm run api:dev
+```
+
+默认监听：
+
+```text
+http://0.0.0.0:7034
+```
+
+可选环境变量：
+
+```text
+API_KEY   必填，请求鉴权密钥
+API_PORT  可选，默认 7034
+API_HOST  可选，默认 0.0.0.0
+```
+
+所有业务接口都需要请求头：
+
+```text
+x-api-key: your-secret-key
+```
+
+`GET /api/health` 不需要鉴权，用于健康检查。
+
+### API 脚本
+
+```bash
+npm run api:dev      # 本地开发启动 API
+npm run api:build    # 编译 API 到 dist-server/
+npm run api:start    # 运行编译后的 API
+npm run api:test     # 编译并运行 API 测试
+```
+
+生产运行示例：
+
+```bash
+npm run api:build
+API_KEY=your-secret-key npm run api:start
+```
+
+Windows PowerShell：
+
+```powershell
+npm run api:build
+$env:API_KEY="your-secret-key"
+npm run api:start
+```
+
+## API 接口
+
+### GET /api/health
+
+健康检查。
+
+响应示例：
+
+```json
+{
+  "success": true,
+  "status": "ok"
+}
+```
+
+### GET /api/y-brace/schema
+
+返回 `y_brace` 的参数字段、默认值和计算目标。
+
+请求头：
+
+```text
+x-api-key: your-secret-key
+```
+
+响应包含：
+
+```json
+{
+  "success": true,
+  "moduleId": "y_brace",
+  "paramFields": [],
+  "defaultParams": {},
+  "calcTargets": [],
+  "defaultCalcTarget": "both"
+}
+```
+
+### POST /api/y-brace/calculate
+
+传入参数，返回结构化计算结果和报告文本。
+
+请求头：
+
+```text
+content-type: application/json
+x-api-key: your-secret-key
+```
+
+请求体：
+
+```json
+{
+  "calcTarget": "both",
+  "params": {
+    "n": 4800,
+    "m": 2144,
+    "mu": 1,
+    "R": 25.151,
+    "A": 9.24,
+    "I": 16.6,
+    "IPrime": 101,
+    "k": 0.5,
+    "f": 205
+  }
+}
+```
+
+`calcTarget` 可选值：
+
+```text
+both    同时验算弱轴和强轴
+weak    只验算弱轴，需要 I
+strong  只验算强轴，需要 IPrime
+```
+
+成功响应包含：
+
+```json
+{
+  "success": true,
+  "moduleId": "y_brace",
+  "calcTarget": "both",
+  "input": {},
+  "normalizedParams": {},
+  "result": {},
+  "conclusion": {
+    "isSafe": true,
+    "message": "验算通过，满足要求。"
+  },
+  "report": {
+    "title": "Y撑复核验算书",
+    "generatedAt": "2026-04-24T00:00:00.000Z",
+    "parameters": [],
+    "sections": [],
+    "conclusion": {}
+  }
+}
+```
+
+### POST /api/y-brace/reports/docx
+
+传入同样的请求体，实时返回 Word 报告文件。
+
+响应头：
+
+```text
+Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document
+Content-Disposition: attachment; filename*=UTF-8''...
+```
+
+curl 示例：
+
+```bash
+curl -X POST http://localhost:7034/api/y-brace/reports/docx \
+  -H "content-type: application/json" \
+  -H "x-api-key: your-secret-key" \
+  -o y_brace_report.docx \
+  -d '{
+    "calcTarget": "both",
+    "params": {
+      "n": 4800,
+      "m": 2144,
+      "mu": 1,
+      "R": 25.151,
+      "A": 9.24,
+      "I": 16.6,
+      "IPrime": 101,
+      "k": 0.5,
+      "f": 205
+    }
+  }'
+```
+
+## 参数校验规则
+
+- `calcTarget` 只允许 `both`、`weak`、`strong`。
+- 基础必填参数：`n`、`m`、`mu`、`R`、`A`、`f`。
+- `weak` 需要 `I`。
+- `strong` 需要 `IPrime`。
+- `both` 同时需要 `I` 和 `IPrime`。
+- 所有数值参数必须是有限正数。
+- `k` 可不传，默认 `0.5`；传入时必须在 `0.1 ~ 0.9` 之间。
+
+校验失败返回 `400`：
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "validation_failed",
+    "message": "请求参数校验失败",
+    "issues": [
+      {
+        "field": "params.n",
+        "code": "positive_number_required",
+        "message": "n 必须大于 0"
+      }
+    ]
+  }
+}
+```
+
+鉴权失败返回 `401`：
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "unauthorized",
+    "message": "缺少或无效的 x-api-key"
+  }
+}
+```
+
+## Docker 部署
+
+当前 Docker 配置会同时部署前端静态页面和 Node.js API 服务：
+
+```text
+前端页面  http://<服务器IP>:7055
+API 服务  http://<服务器IP>:7056
+```
+
+测试版本的 Docker 部署已在 `docker-compose.yml` 中固定使用 API 密钥：
+
+```text
+test_api
+```
+
+### 使用 Docker Compose
+
+```bash
+docker compose up -d --build
+```
+
+Windows PowerShell：
+
+```powershell
+docker compose up -d --build
+```
+
+访问：
+
+```text
+http://<服务器IP>:7055
+http://<服务器IP>:7056/api/health
+```
+
+### 直接使用 Docker
+
+Dockerfile 使用多目标构建：
+
+```bash
+# 构建前端镜像
+docker build --target frontend -t cf-calculation-web:latest .
+
+# 构建 API 镜像
+docker build --target api -t cf-calculation-api:latest .
+```
+
+分别启动：
+
+```bash
+docker run -d --name cf-calculation-web \
+  -p 7055:7055 \
+  --restart unless-stopped \
+  cf-calculation-web:latest
+
+docker run -d --name cf-calculation-api \
+  -p 7056:7056 \
+  -e API_KEY=test_api \
+  --restart unless-stopped \
+  cf-calculation-api:latest
+```
 
 ## 开发说明
 
-- KaTeX 作为 npm 依赖安装，在结果组件中渲染公式
-- Konva 目前通过运行时脚本方式加载，由 `App.tsx` 统一管理加载状态
-- PDF 导出插件通过动态注入脚本加载
-- 当前样式不依赖 Tailwind 构建流程，主要通过现有 CSS 和类名组织
+- 前端模块通过 `src/modules/index.ts` 注册，主界面只依赖统一 `CalcModule` 接口。
+- `y_brace` 的核心计算函数位于 `src/modules/y-brace/calculate.ts`，API 会复用这部分纯计算逻辑。
+- 前端导出逻辑仍位于各模块的 `exportUtils.ts`，其中部分能力依赖浏览器 DOM。
+- 服务端报告生成位于 `server/yBrace/docxReport.ts`，不会使用 `document`、`window`、`file-saver` 或 canvas。
+- API 第一版不实现 PDF，也不会在响应中返回 PDF 字段。
 
-## 后续可改进方向
+## 验证
 
-- 为更多模块补充“Word 原生公式版”导出
-- 统一导出模板与报告样式
-- 补充自动化测试与示例数据
-- 为模块增加更完整的 README 或使用示例
+运行 API 测试：
+
+```bash
+npm run api:test
+```
+
+运行前端构建：
+
+```bash
+npm run build
+```

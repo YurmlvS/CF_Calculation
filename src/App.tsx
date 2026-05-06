@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { modules, getModuleById, defaultModuleId } from './modules';
+import { ParamValue } from './modules/types';
 import Navbar from './components/Navbar';
 import ParamsPanel from './components/ParamsPanel';
 
@@ -22,7 +23,7 @@ export default function App() {
   );
 
   // --- 参数状态 ---
-  const [params, setParams] = useState<Record<string, number | ''>>(() => ({
+  const [params, setParams] = useState<Record<string, ParamValue>>(() => ({
     ...activeModule.defaultParams,
   }));
 
@@ -69,6 +70,10 @@ export default function App() {
     [],
   );
 
+  const handleParamPatch = useCallback((patch: Record<string, ParamValue>) => {
+    setParams((prev) => ({ ...prev, ...patch }));
+  }, []);
+
   // --- 获取模块提供的面板组件 ---
   const ModuleDiagram = activeModule.DiagramPanel;
   const ModuleResult = activeModule.ResultPanel;
@@ -101,6 +106,7 @@ export default function App() {
               activeModule={activeModule}
               params={params}
               onParamChange={handleInputChange}
+              onParamPatch={handleParamPatch}
               calcTarget={calcTarget}
               onCalcTargetChange={setCalcTarget}
             />
@@ -119,7 +125,7 @@ export default function App() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
                     d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                结果报告 (Result Report)
+                结果报告
               </h2>
               <div className="flex gap-2">
                 <div 

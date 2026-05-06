@@ -2,6 +2,7 @@
  * Y撑模块 —— 核心计算逻辑
  */
 import { getPhi, buildPhiTable } from './phiUtils';
+import { ParamValue } from '../types';
 
 // 模块级单例 phiTable，避免每次调用都重建
 const phiTable = buildPhiTable();
@@ -80,7 +81,7 @@ function calcAxis(
  * 核心计算函数
  */
 export function calculate(
-  params: Record<string, number | ''>,
+  params: Record<string, ParamValue>,
   calcTarget: string,
 ): YBraceResult | null {
   const { n, m, mu, R, I, IPrime, A, f, k } = params;

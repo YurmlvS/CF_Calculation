@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useMemo } from 'react';
 import katex from 'katex';
-import { ModuleResultProps } from '../types';
+import { ModuleResultProps, ParamValue } from '../types';
 import { YBraceResult, YBraceAxisResult } from './calculate';
 
 const safeRenderKatex = (tex: string) => {
@@ -28,7 +28,7 @@ const buildLambdaRequirementText = (r: YBraceAxisResult) =>
 function buildAxisLatex(
   axis: 'weak' | 'strong',
   r: YBraceAxisResult,
-  params: Record<string, number | ''>,
+  params: Record<string, ParamValue>,
 ): string {
   const { n, m, mu, R, I, IPrime, A, k, f } = params;
   const kVal = k === '' ? 0.5 : Number(k);
@@ -252,7 +252,7 @@ const ResultPanel: React.FC<ModuleResultProps> = ({ params, calcResult, calcTarg
         {/* 1. 已知参数 */}
         <div className="mb-4">
           <h4 className="text-sm font-semibold text-gray-600 mb-2">
-            1. 计算参数 (Known Parameters):
+            1. 计算参数:
           </h4>
           {result ? (
             <ul
@@ -295,7 +295,7 @@ const ResultPanel: React.FC<ModuleResultProps> = ({ params, calcResult, calcTarg
 
         {/* 最终结论 */}
         <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between">
-          <h4 className="text-sm font-semibold text-gray-600">最终结论 (Final Result):</h4>
+          <h4 className="text-sm font-semibold text-gray-600">最终结论:</h4>
           <span
             style={{
               fontSize: '1.125rem',
