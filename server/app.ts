@@ -1,5 +1,14 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
-import { calculate } from '../src/modules/y-brace/calculate';
+import { calculate as calculateStructuralBeamBiaxial } from '../src/modules/structural-beam-biaxial/calculate';
+import { calculate as calculateYBrace } from '../src/modules/y-brace/calculate';
+import {
+  structuralBeamBiaxialCalcTargets,
+  structuralBeamBiaxialDefaultCalcTarget,
+  structuralBeamBiaxialDefaultParams,
+  structuralBeamBiaxialParamFields,
+} from './structuralBeamBiaxial/schema';
+import { buildStructuralBeamBiaxialReport } from './structuralBeamBiaxial/report';
+import { validateStructuralBeamBiaxialRequest } from './structuralBeamBiaxial/validation';
 import {
   yBraceCalcTargets,
   yBraceDefaultCalcTarget,
@@ -74,7 +83,7 @@ function handleYBraceCalculation(body: unknown) {
   }
 
   const { calcTarget, params, rawParams } = validation.value;
-  const result = calculate(params, calcTarget);
+  const result = calculateYBrace(params, calcTarget);
 
   if (!result) {
     return {
@@ -96,6 +105,56 @@ function handleYBraceCalculation(body: unknown) {
     body: {
       success: true,
       moduleId: 'y_brace',
+      calcTarget,
+      input: rawParams,
+      normalizedParams: params,
+      result,
+      conclusion: report.conclusion,
+      report,
+    },
+  } as const;
+}
+
+function handleStructuralBeamBiaxialCalculation(body: unknown) {
+  const validation = validateStructuralBeamBiaxialRequest(body);
+
+  if (!validation.ok) {
+    return {
+      status: 400,
+      body: {
+        success: false,
+        error: {
+          code: 'validation_failed',
+          message: 'Request parameter validation failed',
+          issues: validation.issues,
+        },
+      },
+    } as const;
+  }
+
+  const { calcTarget, params, rawParams } = validation.value;
+  const result = calculateStructuralBeamBiaxial(params, calcTarget);
+
+  if (!result) {
+    return {
+      status: 422,
+      body: {
+        success: false,
+        error: {
+          code: 'calculation_failed',
+          message: 'Parameters passed validation, but calculation did not produce a result',
+        },
+      },
+    } as const;
+  }
+
+  const report = buildStructuralBeamBiaxialReport(calcTarget, params, result);
+
+  return {
+    status: 200,
+    body: {
+      success: true,
+      moduleId: 'structural_beam_biaxial',
       calcTarget,
       input: rawParams,
       normalizedParams: params,
@@ -129,6 +188,22 @@ export function createApp() {
 
   app.post('/api/y-brace/calculate', (req, res) => {
     const response = handleYBraceCalculation(req.body);
+    res.status(response.status).json(response.body);
+  });
+
+  app.get('/api/structural-beam-biaxial/schema', (_req, res) => {
+    res.json({
+      success: true,
+      moduleId: 'structural_beam_biaxial',
+      paramFields: structuralBeamBiaxialParamFields,
+      defaultParams: structuralBeamBiaxialDefaultParams,
+      calcTargets: structuralBeamBiaxialCalcTargets,
+      defaultCalcTarget: structuralBeamBiaxialDefaultCalcTarget,
+    });
+  });
+
+  app.post('/api/structural-beam-biaxial/calculate', (req, res) => {
+    const response = handleStructuralBeamBiaxialCalculation(req.body);
     res.status(response.status).json(response.body);
   });
 

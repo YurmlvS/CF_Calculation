@@ -185,3 +185,97 @@ test('returns a docx report as binary content', async () => {
   assert.ok(response.headers.get('content-disposition')?.includes('.docx'));
   assert.ok(bytes.byteLength > 0);
 });
+
+test('calculates structural_beam_biaxial with normalized catalog selections', async () => {
+  const response = await fetch(`${baseUrl}/api/structural-beam-biaxial/calculate`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': apiKey,
+    },
+    body: JSON.stringify({
+      calcTarget: 'all',
+      params: {
+        h: 500,
+        b: 250,
+        l: 10,
+        q: 20,
+        F: 50,
+        concreteGrade: 'C30',
+        steelGrade: 'HRB400\\HRBF400\\RRB400',
+        xRebarCount: 4,
+        xRebarDiameter: 20,
+        yRebarCount: 4,
+        yRebarDiameter: 18,
+      },
+    }),
+  });
+
+  const body = await response.json() as any;
+
+  assert.equal(response.status, 200);
+  assert.equal(body.success, true);
+  assert.equal(body.moduleId, 'structural_beam_biaxial');
+  assert.equal(body.normalizedParams.fc, 14.3);
+  assert.equal(body.normalizedParams.ft, 1.43);
+  assert.equal(body.normalizedParams.fy, 360);
+  assert.equal(body.normalizedParams.Aux, 1256);
+  assert.equal(body.normalizedParams.Auy, 1017);
+  assert.ok(body.result.worst);
+  assert.ok(body.result.flexural.x);
+  assert.ok(body.result.flexural.y);
+  assert.ok(body.result.shear);
+  assert.ok(Array.isArray(body.report.sections));
+});
+
+test('schema exposes structural_beam_biaxial fields and targets', async () => {
+  const response = await fetch(`${baseUrl}/api/structural-beam-biaxial/schema`, {
+    headers: { 'x-api-key': apiKey },
+  });
+
+  const body = await response.json() as any;
+  const concreteField = body.paramFields.find((field: any) => field.key === 'concreteGrade');
+  const targetValues = body.calcTargets.map((target: any) => target.value);
+
+  assert.equal(response.status, 200);
+  assert.equal(body.moduleId, 'structural_beam_biaxial');
+  assert.equal(body.defaultCalcTarget, 'all');
+  assert.equal(concreteField.inputType, 'select');
+  assert.ok(concreteField.options.some((option: any) => option.value === 'C30'));
+  assert.deepEqual(targetValues, ['all', 'worst', 'rebar', 'shear']);
+});
+
+test('returns structural_beam_biaxial validation issues', async () => {
+  const response = await fetch(`${baseUrl}/api/structural-beam-biaxial/calculate`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': apiKey,
+    },
+    body: JSON.stringify({
+      calcTarget: 'all',
+      params: {
+        h: 40,
+        b: 250,
+        l: 10,
+        q: 20,
+        F: 50,
+        concreteGrade: 'C30',
+        steelGrade: 'bad-steel',
+        xRebarCount: 4,
+        xRebarDiameter: 20,
+        yRebarCount: 99,
+        yRebarDiameter: 18,
+      },
+    }),
+  });
+
+  const body = await response.json() as any;
+
+  assert.equal(response.status, 400);
+  assert.equal(body.success, false);
+  assert.equal(body.error.code, 'validation_failed');
+  assert.ok(body.error.issues.some((issue: any) => issue.field === 'params.h'));
+  assert.ok(body.error.issues.some((issue: any) => issue.field === 'params.steelGrade'));
+  assert.ok(body.error.issues.some((issue: any) => issue.field === 'params.yRebarCount'));
+});

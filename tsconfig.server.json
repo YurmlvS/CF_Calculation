@@ -15,6 +15,11 @@
   },
   "include": [
     "server/**/*.ts",
+    "src/modules/types.ts",
+    "src/modules/structural-beam-biaxial/calculate.ts",
+    "src/modules/structural-beam-biaxial/materials.ts",
+    "src/modules/structural-beam-biaxial/params.ts",
+    "src/modules/structural-beam-biaxial/rebarTable.ts",
     "src/modules/y-brace/calculate.ts",
     "src/modules/y-brace/materials.ts",
     "src/modules/y-brace/phiUtils.ts",
