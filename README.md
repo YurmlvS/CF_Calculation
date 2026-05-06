@@ -1,21 +1,22 @@
 # CF_Calculation
 
-结构力学计算工具集，当前基于 `React 18 + TypeScript + Vite 5 + Tauri 2` 构建，同时新增了独立的 Node.js API 服务。项目既可以作为浏览器/桌面计算工具使用，也可以通过 HTTP API 接收用户数据并返回计算结果或 Word 报告。
+结构力学计算工具集，当前基于 `React 18 + TypeScript + Vite 5 + Tauri 2` 构建，并提供独立的 Node.js API 服务。项目可以作为浏览器/桌面计算工具使用，也可以通过 HTTP API 接收参数并返回结构化计算结果或 Word 报告。
 
 ## 功能概览
 
-- 前端计算界面：支持模块切换、参数输入、结构示意图、计算结果展示。
+- 前端计算界面：支持计算模块切换、参数输入、示意图展示、结果展示和导出。
 - 桌面应用：通过 Tauri 2 打包为本地桌面应用。
-- 计算模块：
+- 已注册计算模块：
   - `y_brace`：Y 撑复核验算。
-  - `triangle`：直角三角形勾股定理计算。
-- 报告导出：
-  - 前端支持模块自带的 Word/PDF 导出能力。
-  - API 第一版仅支持 `y_brace`，返回 JSON 结果和 `.docx` Word 报告，不提供 PDF。
+  - `structural_beam_biaxial`：结构梁双向受力验算。
+- 前端导出：
+  - 各模块保留自身的 Word、LaTeX、PDF 导出能力。
 - API 服务：
   - 基于 Express。
   - 使用 `x-api-key` 做简单鉴权。
   - 使用 zod/自定义校验返回字段级错误。
+  - 支持 `y_brace` 与 `structural_beam_biaxial` 的 schema/calculate 接口。
+  - 当前服务端 `.docx` 报告接口仅支持 `y_brace`，暂不提供服务端 PDF。
 
 ## 项目结构
 
@@ -27,25 +28,23 @@ CF_Calculation/
 │  ├─ modules/                  # 计算模块注册与具体模块
 │  │  ├─ index.ts               # 模块注册表
 │  │  ├─ types.ts               # 统一模块接口
-│  │  ├─ y-brace/               # Y 撑计算、前端结果、前端导出
-│  │  └─ triangle/              # 三角形计算、前端结果、前端导出
+│  │  ├─ y-brace/               # Y 撑计算、展示与前端导出
+│  │  ├─ structural-beam-biaxial/# 结构梁双向受力验算
+│  │  └─ triangle/              # 三角形模块代码，目前未注册启用
 │  └─ utils/
 ├─ server/                      # Node.js API 服务
 │  ├─ index.ts                  # API 启动入口
 │  ├─ app.ts                    # Express app、鉴权、路由
-│  ├─ yBrace/
-│  │  ├─ schema.ts              # API 对外 schema 元信息
-│  │  ├─ validation.ts          # 请求参数校验
-│  │  ├─ report.ts              # JSON 报告文本结构
-│  │  └─ docxReport.ts          # 服务端 Word 报告生成
+│  ├─ yBrace/                   # Y 撑 API schema、校验、报告、docx
+│  ├─ structuralBeamBiaxial/    # 结构梁 API schema、校验、JSON 报告
 │  └─ __tests__/                # API 测试
 ├─ src-tauri/                   # Tauri 桌面应用配置与 Rust 入口
 ├─ docker/                      # Nginx 静态部署配置
 ├─ Dockerfile
 ├─ docker-compose.yml
 ├─ package.json
-├─ tsconfig.json                # 前端 TypeScript 配置
-└─ tsconfig.server.json         # API TypeScript 配置
+├─ tsconfig.json
+└─ tsconfig.server.json
 ```
 
 ## 安装依赖
@@ -54,45 +53,23 @@ CF_Calculation/
 npm install
 ```
 
-建议使用 Node.js 18+。
+建议使用 Node.js 18+；Docker 镜像使用 Node.js 20。
 
 ## 前端开发与构建
 
-启动浏览器开发环境：
-
 ```bash
-npm run dev
+npm run dev          # 启动 Vite 开发环境
+npm run build        # 构建前端静态资源
+npm run preview      # 预览构建产物
+npm run tauri dev    # 启动 Tauri 桌面开发环境
+npm run tauri build  # 构建桌面应用
 ```
 
-构建前端静态资源：
+## API 服务
 
-```bash
-npm run build
-```
+API 是独立 Node.js 服务，不依赖浏览器 DOM，也不会启动 Tauri。
 
-预览构建产物：
-
-```bash
-npm run preview
-```
-
-启动 Tauri 桌面开发环境：
-
-```bash
-npm run tauri dev
-```
-
-构建桌面应用：
-
-```bash
-npm run tauri build
-```
-
-## API 服务用法
-
-API 是独立的 Node.js 服务，不依赖浏览器 DOM，也不会启动 Tauri。第一版只开放 `y_brace` 模块。
-
-### 启动 API
+### 启动
 
 PowerShell 示例：
 
@@ -107,7 +84,7 @@ npm run api:dev
 http://0.0.0.0:7034
 ```
 
-可选环境变量：
+环境变量：
 
 ```text
 API_KEY   必填，请求鉴权密钥
@@ -115,15 +92,13 @@ API_PORT  可选，默认 7034
 API_HOST  可选，默认 0.0.0.0
 ```
 
-所有业务接口都需要请求头：
+除 `GET /api/health` 外，所有业务接口都需要请求头：
 
 ```text
 x-api-key: your-secret-key
 ```
 
-`GET /api/health` 不需要鉴权，用于健康检查。
-
-### API 脚本
+### 脚本
 
 ```bash
 npm run api:dev      # 本地开发启动 API
@@ -151,9 +126,7 @@ npm run api:start
 
 ### GET /api/health
 
-健康检查。
-
-响应示例：
+健康检查，无需鉴权。
 
 ```json
 {
@@ -164,39 +137,11 @@ npm run api:start
 
 ### GET /api/y-brace/schema
 
-返回 `y_brace` 的参数字段、默认值和计算目标。
-
-请求头：
-
-```text
-x-api-key: your-secret-key
-```
-
-响应包含：
-
-```json
-{
-  "success": true,
-  "moduleId": "y_brace",
-  "paramFields": [],
-  "defaultParams": {},
-  "calcTargets": [],
-  "defaultCalcTarget": "both"
-}
-```
+返回 `y_brace` 的参数字段、默认参数和计算目标。
 
 ### POST /api/y-brace/calculate
 
-传入参数，返回结构化计算结果和报告文本。
-
-请求头：
-
-```text
-content-type: application/json
-x-api-key: your-secret-key
-```
-
-请求体：
+传入 Y 撑参数，返回结构化计算结果和 JSON 报告。
 
 ```json
 {
@@ -206,11 +151,9 @@ x-api-key: your-secret-key
     "m": 2144,
     "mu": 1,
     "R": 25.151,
-    "A": 9.24,
-    "I": 16.6,
-    "IPrime": 101,
+    "materialSpec": "8号槽钢",
     "k": 0.5,
-    "f": 205
+    "f": "Q355"
   }
 }
 ```
@@ -219,46 +162,15 @@ x-api-key: your-secret-key
 
 ```text
 both    同时验算弱轴和强轴
-weak    只验算弱轴，需要 I
-strong  只验算强轴，需要 IPrime
+weak    只验算弱轴，需提供 I 或选择内置型材
+strong  只验算强轴，需提供 IPrime 或选择内置型材
 ```
 
-成功响应包含：
-
-```json
-{
-  "success": true,
-  "moduleId": "y_brace",
-  "calcTarget": "both",
-  "input": {},
-  "normalizedParams": {},
-  "result": {},
-  "conclusion": {
-    "isSafe": true,
-    "message": "验算通过，满足要求。"
-  },
-  "report": {
-    "title": "Y撑复核验算书",
-    "generatedAt": "2026-04-24T00:00:00.000Z",
-    "parameters": [],
-    "sections": [],
-    "conclusion": {}
-  }
-}
-```
+Y 撑支持内置型材选择；选择内置 `materialSpec` 时，`A`、`I`、`IPrime` 会由材料库自动补齐。`f` 支持 `Q235`/`205` 和 `Q355`/`295`。
 
 ### POST /api/y-brace/reports/docx
 
-传入同样的请求体，实时返回 Word 报告文件。
-
-响应头：
-
-```text
-Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document
-Content-Disposition: attachment; filename*=UTF-8''...
-```
-
-curl 示例：
+传入与 `/api/y-brace/calculate` 相同的请求体，实时返回 Word 报告文件。
 
 ```bash
 curl -X POST http://localhost:7034/api/y-brace/reports/docx \
@@ -272,26 +184,83 @@ curl -X POST http://localhost:7034/api/y-brace/reports/docx \
       "m": 2144,
       "mu": 1,
       "R": 25.151,
-      "A": 9.24,
-      "I": 16.6,
-      "IPrime": 101,
+      "materialSpec": "8号槽钢",
       "k": 0.5,
-      "f": 205
+      "f": "Q355"
     }
   }'
 ```
 
-## 参数校验规则
+响应头：
+
+```text
+Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document
+Content-Disposition: attachment; filename*=UTF-8''...
+```
+
+### GET /api/structural-beam-biaxial/schema
+
+返回 `structural_beam_biaxial` 的参数字段、默认参数和计算目标。
+
+### POST /api/structural-beam-biaxial/calculate
+
+传入结构梁双向受力验算参数，返回最不利截面、双向受弯、斜截面受剪等结构化结果和 JSON 报告。
+
+```json
+{
+  "calcTarget": "all",
+  "params": {
+    "h": 500,
+    "b": 250,
+    "l": 10,
+    "q": 20,
+    "F": 50,
+    "concreteGrade": "C30",
+    "steelGrade": "HRB400\\HRBF400\\RRB400",
+    "xRebarCount": 4,
+    "xRebarDiameter": 20,
+    "yRebarCount": 4,
+    "yRebarDiameter": 18
+  }
+}
+```
+
+`calcTarget` 可选值：
+
+```text
+all    默认完整计算
+worst  最不利点判定
+rebar  纵向受拉钢筋截面面积计算
+shear  斜截面受剪验算
+```
+
+结构梁模块支持混凝土、钢筋材料和钢筋根数/直径的内置选项；选择内置选项时，`fc`、`ft`、`fy`、`Aux`、`Auy` 可自动归一化补齐。选择 `custom` 时需要手动传入对应数值。
+
+## 校验规则
+
+通用规则：
+
+- 请求体必须包含 `params` 对象。
+- 所有参与计算的数值必须是有限正数。
+- 鉴权失败返回 `401`，参数校验失败返回 `400`，计算未产生结果返回 `422`。
+
+Y 撑规则：
 
 - `calcTarget` 只允许 `both`、`weak`、`strong`。
 - 基础必填参数：`n`、`m`、`mu`、`R`、`A`、`f`。
-- `weak` 需要 `I`。
-- `strong` 需要 `IPrime`。
-- `both` 同时需要 `I` 和 `IPrime`。
-- 所有数值参数必须是有限正数。
+- `weak` 需要 `I`；`strong` 需要 `IPrime`；`both` 同时需要 `I` 和 `IPrime`。
+- 若选择内置 `materialSpec`，`A`、`I`、`IPrime` 由材料库补齐。
 - `k` 可不传，默认 `0.5`；传入时必须在 `0.1 ~ 0.9` 之间。
 
-校验失败返回 `400`：
+结构梁规则：
+
+- `calcTarget` 只允许 `all`、`worst`、`rebar`、`shear`。
+- 必填参数：`h`、`b`、`l`、`q`、`F`、`fc`、`ft`、`fy`、`Aux`、`Auy`。
+- `h` 和 `b` 必须大于 `40`。
+- `concreteGrade`、`steelGrade` 可以选择内置材料或 `custom`。
+- 钢筋根数/直径可以选择内置规格或 `custom`；内置组合会自动计算 `Aux`、`Auy`。
+
+错误响应示例：
 
 ```json
 {
@@ -310,18 +279,6 @@ curl -X POST http://localhost:7034/api/y-brace/reports/docx \
 }
 ```
 
-鉴权失败返回 `401`：
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "unauthorized",
-    "message": "缺少或无效的 x-api-key"
-  }
-}
-```
-
 ## Docker 部署
 
 当前 Docker 配置会同时部署前端静态页面和 Node.js API 服务：
@@ -331,40 +288,22 @@ curl -X POST http://localhost:7034/api/y-brace/reports/docx \
 API 服务  http://<服务器IP>:7056
 ```
 
-测试版本的 Docker 部署已在 `docker-compose.yml` 中固定使用 API 密钥：
+`docker-compose.yml` 中测试用 API 密钥为：
 
 ```text
 test_api
 ```
 
-### 使用 Docker Compose
+使用 Docker Compose：
 
 ```bash
 docker compose up -d --build
 ```
 
-Windows PowerShell：
-
-```powershell
-docker compose up -d --build
-```
-
-访问：
-
-```text
-http://<服务器IP>:7055
-http://<服务器IP>:7056/api/health
-```
-
-### 直接使用 Docker
-
-Dockerfile 使用多目标构建：
+直接使用 Dockerfile 的多目标构建：
 
 ```bash
-# 构建前端镜像
 docker build --target frontend -t cf-calculation-web:latest .
-
-# 构建 API 镜像
 docker build --target api -t cf-calculation-api:latest .
 ```
 
@@ -386,21 +325,14 @@ docker run -d --name cf-calculation-api \
 ## 开发说明
 
 - 前端模块通过 `src/modules/index.ts` 注册，主界面只依赖统一 `CalcModule` 接口。
-- `y_brace` 的核心计算函数位于 `src/modules/y-brace/calculate.ts`，API 会复用这部分纯计算逻辑。
-- 前端导出逻辑仍位于各模块的 `exportUtils.ts`，其中部分能力依赖浏览器 DOM。
-- 服务端报告生成位于 `server/yBrace/docxReport.ts`，不会使用 `document`、`window`、`file-saver` 或 canvas。
-- API 第一版不实现 PDF，也不会在响应中返回 PDF 字段。
+- 纯计算逻辑位于各模块的 `calculate.ts`，API 会复用这些计算函数。
+- 前端导出逻辑位于各模块的 `exportUtils.ts`，部分能力依赖浏览器 DOM。
+- 服务端 Y 撑 Word 报告生成位于 `server/yBrace/docxReport.ts`，不依赖 `document`、`window`、`file-saver` 或 canvas。
+- `structural_beam_biaxial` 当前 API 返回 JSON 报告，不提供服务端 `.docx` 下载接口。
 
 ## 验证
 
-运行 API 测试：
-
 ```bash
 npm run api:test
-```
-
-运行前端构建：
-
-```bash
 npm run build
 ```
