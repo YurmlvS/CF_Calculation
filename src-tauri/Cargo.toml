@@ -1,6 +1,6 @@
 [package]
 name = "cf-calculation"
-version = "0.1.0"
+version = "1.0.5"
 description = "结构力学计算器 - Y撑复核验算工具"
 authors = ["you"]
 edition = "2021"
