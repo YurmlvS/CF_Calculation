@@ -165,7 +165,7 @@ export const defaultParams: Record<string, ParamValue> = {
 };
 
 export const calcTargets: CalcTargetOption[] = [
-  { value: 'all', label: '全部计算（最不利点判定、纵向受拉钢筋的截面面积计算、斜截面受剪验算）' },
+  { value: 'all', label: '默认计算' },
   { value: 'worst', label: '最不利点判定' },
   { value: 'rebar', label: '纵向受拉钢筋的截面面积计算' },
   { value: 'shear', label: '斜截面受剪验算' },
