@@ -27,6 +27,13 @@ export interface ParamFieldDef {
   placeholder: string;
   inputType?: 'number' | 'select';
   options?: ParamOption[];
+  inlineWithNext?: {
+    separator: string;
+  };
+  getPatchOnChange?: (
+    value: ParamValue,
+    params: Record<string, ParamValue>,
+  ) => Record<string, ParamValue>;
   readOnlyWhen?: {
     key: string;
     notValue?: ParamValue;

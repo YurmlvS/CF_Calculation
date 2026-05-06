@@ -16,7 +16,7 @@ interface ParamsPanelProps {
 /** 单个输入行（标签 + 输入框，竖向单列） */
 const Field: React.FC<{
   id: string;
-  label: string;
+  label: React.ReactNode;
   placeholder: string;
   value: ParamValue;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -67,6 +67,22 @@ const Field: React.FC<{
     />
   </div>
 );
+
+const renderRichLabel = (label: string): React.ReactNode => {
+  const parts: React.ReactNode[] = [];
+  const re = /_([A-Za-z0-9]+)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = re.exec(label)) !== null) {
+    if (match.index > lastIndex) parts.push(label.slice(lastIndex, match.index));
+    parts.push(<sub key={`${match.index}-${match[1]}`}>{match[1]}</sub>);
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < label.length) parts.push(label.slice(lastIndex));
+  return parts.length > 0 ? parts : label;
+};
 
 /** section 卡片公共样式 */
 const sectionStyle: React.CSSProperties = {
@@ -127,11 +143,38 @@ const ParamsPanel: React.FC<ParamsPanelProps> = ({
   const handleSelectChange = (field: ParamFieldDef, value: string) => {
     const selectedOption = field.options?.find((option) => String(option.value) === value);
     const fieldValue = selectedOption ? selectedOption.value : value;
+    const dynamicPatch = field.getPatchOnChange?.(fieldValue, params) ?? {};
     onParamPatch({
       [field.key]: fieldValue,
       ...(selectedOption?.fill ?? {}),
+      ...dynamicPatch,
     });
   };
+
+  const renderSelectControl = (field: ParamFieldDef) => (
+    <select
+      id={`input-${field.key}`}
+      value={String(params[field.key] ?? '')}
+      onChange={(e) => handleSelectChange(field, e.target.value)}
+      style={selectStyle}
+      onFocus={(e) => {
+        e.target.style.borderColor = '#3b82f6';
+        e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.2)';
+        e.target.style.backgroundColor = '#ffffff';
+      }}
+      onBlur={(e) => {
+        e.target.style.borderColor = '#d1d5db';
+        e.target.style.boxShadow = 'none';
+        e.target.style.backgroundColor = '#f9fafb';
+      }}
+    >
+      {field.options?.map((option) => (
+        <option key={String(option.value)} value={String(option.value)}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  );
 
   const renderField = (field: ParamFieldDef) => {
     if (field.inputType === 'select') {
@@ -147,30 +190,9 @@ const ParamsPanel: React.FC<ParamsPanelProps> = ({
               color: '#374151',
             }}
           >
-            {field.label}
+            {renderRichLabel(field.label)}
           </label>
-          <select
-            id={`input-${field.key}`}
-            value={String(params[field.key] ?? '')}
-            onChange={(e) => handleSelectChange(field, e.target.value)}
-            style={selectStyle}
-            onFocus={(e) => {
-              e.target.style.borderColor = '#3b82f6';
-              e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.2)';
-              e.target.style.backgroundColor = '#ffffff';
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = '#d1d5db';
-              e.target.style.boxShadow = 'none';
-              e.target.style.backgroundColor = '#f9fafb';
-            }}
-          >
-            {field.options?.map((option) => (
-              <option key={String(option.value)} value={String(option.value)}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          {renderSelectControl(field)}
         </div>
       );
     }
@@ -179,13 +201,52 @@ const ParamsPanel: React.FC<ParamsPanelProps> = ({
       <Field
         key={field.key}
         id={`input-${field.key}`}
-        label={field.label}
+        label={renderRichLabel(field.label)}
         placeholder={field.placeholder}
         value={params[field.key] ?? ''}
         onChange={onParamChange(field.key)}
         disabled={isFieldReadOnly(field)}
       />
     );
+  };
+
+  const renderParamFields = () => {
+    const nodes: React.ReactNode[] = [];
+
+    for (let i = 0; i < activeModule.paramFields.length; i += 1) {
+      const field = activeModule.paramFields[i];
+      const nextField = activeModule.paramFields[i + 1];
+
+      if (field.inlineWithNext && nextField?.inputType === 'select') {
+        nodes.push(
+          <div key={`${field.key}-${nextField.key}`} style={{ marginBottom: '0.625rem' }}>
+            <label
+              htmlFor={`input-${field.key}`}
+              style={{
+                display: 'block',
+                marginBottom: '0.25rem',
+                fontSize: '0.75rem',
+                fontWeight: 500,
+                color: '#374151',
+              }}
+            >
+              {renderRichLabel(field.label)}
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '0.5rem' }}>
+              {renderSelectControl(field)}
+              <span style={{ color: '#374151', fontWeight: 700 }}>{field.inlineWithNext.separator}</span>
+              {renderSelectControl(nextField)}
+            </div>
+          </div>,
+        );
+        i += 1;
+        continue;
+      }
+
+      nodes.push(renderField(field));
+    }
+
+    return nodes;
   };
 
   return (
@@ -236,7 +297,7 @@ const ParamsPanel: React.FC<ParamsPanelProps> = ({
           参数输入
         </h2>
 
-        {activeModule.paramFields.map(renderField)}
+        {renderParamFields()}
       </section>
 
       {/* ── 计算目标（如果模块有多个目标选项） ── */}
