@@ -4,3 +4,5 @@ dist-server/
 src-tauri/target/
 *.local
 .env
+vite-dev.log
+vite-dev.err.log
