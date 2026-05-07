@@ -197,7 +197,7 @@ export default function App() {
                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#eff6ff')}
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
                     >
-                      导出LaTeX版
+                      导出编辑公式版
                     </button>
                   </div>
                 </div>

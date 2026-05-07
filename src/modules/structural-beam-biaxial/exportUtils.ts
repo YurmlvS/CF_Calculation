@@ -2,6 +2,7 @@ import {
   AlignmentType,
   Document,
   HeadingLevel,
+  ImageRun,
   Packer,
   Paragraph,
   TextRun,
@@ -129,6 +130,26 @@ function createDoc(children: Paragraph[]): Document {
   });
 }
 
+async function getKonvaImageBytes(): Promise<Uint8Array | null> {
+  try {
+    const canvas = document.querySelector<HTMLCanvasElement>('canvas');
+    if (!canvas) return null;
+
+    const dataUrl = canvas.toDataURL('image/png');
+    const base64 = dataUrl.split(',')[1];
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+
+    return bytes;
+  } catch {
+    return null;
+  }
+}
+
 function getConcreteLabel(params: CalcParams): string {
   return params.concreteGrade && params.concreteGrade !== 'custom'
     ? String(params.concreteGrade)
@@ -141,10 +162,26 @@ function getSteelLabel(params: CalcParams): string {
     : '自定义';
 }
 
-function buildWordParagraphs(calcResult: StructuralBeamBiaxialResult, params: CalcParams): Paragraph[] {
+async function buildWordParagraphs(calcResult: StructuralBeamBiaxialResult, params: CalcParams): Promise<Paragraph[]> {
   const { input, worst, flexural, shear } = calcResult;
   const x = flexural.x;
   const y = flexural.y;
+  const imgBytes = await getKonvaImageBytes();
+  const diagramParagraphs: Paragraph[] = imgBytes
+    ? [
+      new Paragraph({
+        children: [
+          new ImageRun({
+            type: 'png',
+            data: imgBytes,
+            transformation: { width: 360, height: 520 },
+          }),
+        ],
+        alignment: AlignmentType.LEFT,
+        spacing: { after: 200 },
+      }),
+    ]
+    : [];
 
   return [
     new Paragraph({
@@ -153,6 +190,7 @@ function buildWordParagraphs(calcResult: StructuralBeamBiaxialResult, params: Ca
       alignment: AlignmentType.CENTER,
     }),
     heading('基本参数情况'),
+    ...diagramParagraphs,
     paraText(`混凝土 ${getConcreteLabel(params)}`),
     paraText(`钢筋 ${getSteelLabel(params)}`),
     paraText(`截面 b=${input.b} mm  h=${input.h} mm`),
@@ -254,7 +292,7 @@ export async function exportToWord(
     return;
   }
 
-  const doc = createDoc(buildWordParagraphs(calcResult, params));
+  const doc = createDoc(await buildWordParagraphs(calcResult, params));
   const blob = await Packer.toBlob(doc);
   saveAs(blob, `结构梁双向受力验算书_${formatExportTimestamp()}.docx`);
 }
@@ -345,4 +383,3 @@ export async function exportToPDF(calcResult: StructuralBeamBiaxialResult | null
     element.style.flex = prevFlex;
   }
 }
-

@@ -2,8 +2,56 @@ import React, { useEffect, useRef } from 'react';
 import { ModuleDiagramProps, ParamValue } from '../types';
 import { paramFields } from './params';
 
+type ModelPoint = { x: number; y: number };
+
 const DIM_STROKE = '#22c55e';
+const DIM_LABEL_FILL = '#dc2626';
 const SHAPE_STROKE = '#111827';
+const DASH_STROKE = '#6b7280';
+
+const BASE_POINTS: Record<string, ModelPoint> = {
+  P1: { x: 0, y: 0 },
+  P2: { x: -1.732, y: 1 },
+  P3: { x: 1.732, y: 1 },
+  P4: { x: 0, y: 8 },
+  P5: { x: -1.732, y: 8 },
+  P6: { x: 1.732, y: 5 },
+  P7: { x: -17.321, y: 17 },
+  P8: { x: -17.321, y: 18 },
+  P9: { x: -1.732, y: 9 },
+  P10: { x: 0, y: 28 },
+  P11: { x: 17.321, y: 18 },
+  P12: { x: 17.321, y: 10 },
+  P13: { x: 15.588, y: 9 },
+  P14: { x: 13.856, y: 10 },
+  P15: { x: 15.588, y: 13 },
+  P16: { x: 13.856, y: 12 },
+  P17: { x: 15.588, y: 19 },
+};
+
+const SOLID_LINES = [
+  ['P1', 'P2'],
+  ['P1', 'P3'],
+  ['P1', 'P4'],
+  ['P2', 'P5'],
+  ['P3', 'P6'],
+  ['P5', 'P7'],
+  ['P7', 'P8'],
+  ['P4', 'P8'],
+  ['P8', 'P10'],
+  ['P10', 'P11'],
+  ['P11', 'P12'],
+  ['P12', 'P13'],
+  ['P13', 'P14'],
+  ['P13', 'P15'],
+  ['P14', 'P16'],
+  ['P4', 'P11'],
+  ['P15', 'P6'],
+] as const;
+
+const DASHED_LINE = ['P9', 'P17'] as const;
+const L_AFFECTED_POINTS = ['P10', 'P17', 'P11', 'P12', 'P13', 'P14', 'P15', 'P16'];
+const H_AFFECTED_POINTS = ['P6', 'P15', 'P16'];
 
 const getPlaceholderNumber = (key: string, fallback: number) => {
   const field = paramFields.find((item) => item.key === key);
@@ -18,9 +66,24 @@ const getDrawValue = (value: ParamValue, placeholder: number) => {
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
+const distance = (a: ModelPoint, b: ModelPoint) => Math.hypot(b.x - a.x, b.y - a.y);
+const midpoint = (a: ModelPoint, b: ModelPoint): ModelPoint => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+const direction = (degrees: number): ModelPoint => {
+  const radians = (degrees * Math.PI) / 180;
+  return { x: Math.cos(radians), y: Math.sin(radians) };
+};
+const movePoint = (point: ModelPoint, vector: ModelPoint, amount: number): ModelPoint => ({
+  x: point.x + vector.x * amount,
+  y: point.y + vector.y * amount,
+});
+
 const DEFAULT_H = getPlaceholderNumber('h', 500);
 const DEFAULT_B = getPlaceholderNumber('b', 250);
 const DEFAULT_L = getPlaceholderNumber('l', 10);
+const MAX_H_VISUAL_VALUE = 700;
+const BASE_B_OFFSET_LENGTH = distance(BASE_POINTS.P4, BASE_POINTS.P9);
+const BASE_H_LENGTH = distance(midpoint(BASE_POINTS.P4, BASE_POINTS.P11), midpoint(BASE_POINTS.P15, BASE_POINTS.P6));
+const BASE_L_LENGTH = distance(BASE_POINTS.P11, BASE_POINTS.P17);
 
 const DiagramPanel: React.FC<ModuleDiagramProps> = ({ params, isKonvaLoaded }) => {
   const konvaContainerRef = useRef<HTMLDivElement>(null);
@@ -71,130 +134,145 @@ const DiagramPanel: React.FC<ModuleDiagramProps> = ({ params, isKonvaLoaded }) =
       const drawH = getDrawValue(params.h, DEFAULT_H);
       const drawB = getDrawValue(params.b, DEFAULT_B);
       const drawL = getDrawValue(params.l, DEFAULT_L);
+      const hVisualValue = Math.min(drawH, MAX_H_VISUAL_VALUE);
+      const defaultHVisualValue = Math.min(DEFAULT_H, MAX_H_VISUAL_VALUE);
+      const points: Record<string, ModelPoint> = Object.fromEntries(
+        Object.entries(BASE_POINTS).map(([key, value]) => [key, { ...value }]),
+      );
 
-      const bScale = clamp(Math.sqrt(drawB / DEFAULT_B), 0.55, 1.9);
-      const hScale = clamp(Math.sqrt(drawH / DEFAULT_H), 0.55, 1.9);
-      const lScale = clamp(Math.sqrt(drawL / DEFAULT_L), 0.55, 1.9);
+      const lShift = ((drawL - DEFAULT_L) / DEFAULT_L) * BASE_L_LENGTH;
+      const hShift = ((hVisualValue - defaultHVisualValue) / DEFAULT_H) * BASE_H_LENGTH;
+      const lVector = direction(30);
+      const hVector = direction(-90);
+      const bVector = direction(150);
 
-      const beamLength = 262 * lScale;
-      const beamWidth = 38 * bScale;
-      const beamHeight = 109 * hScale;
-      const depthX = 96 * lScale;
-      const depthY = 109 * lScale;
-      const lip = Math.max(6, beamWidth * 0.16);
-
-      const x = {
-        left: 0,
-        backLeft: depthX,
-        innerLeft: beamLength - beamWidth,
-        innerRib: beamLength - beamWidth * 0.63,
-        frontRight: beamLength,
-        rightRib: beamLength + beamWidth * 0.37,
-        sideLeft: beamLength + depthX * 0.46,
-        sideMid: beamLength + depthX * 0.6,
-        sideRight: beamLength + depthX * 0.86,
-        backRight: beamLength + depthX,
-      };
-      const y = {
-        backTop: 0,
-        backLip: 6 * hScale,
-        sideMid: beamHeight * 0.62,
-        frontTop: depthY,
-        frontLip: depthY + lip,
-        sideLower: depthY + lip + beamHeight * 0.15,
-        ribLower: depthY + lip + beamHeight * 0.27,
-        bottomInner: depthY + lip + beamHeight * 0.86,
-        bottom: depthY + lip + beamHeight,
-      };
-
-      const polygons = [
-        [x.innerLeft, y.frontLip, x.sideMid, y.backLip, x.sideMid, y.frontLip, x.sideLeft, y.sideLower, x.sideLeft, y.sideMid, x.innerRib, y.ribLower, x.innerRib, y.bottomInner, x.innerLeft, y.bottom],
-        [x.sideLeft, y.sideLower, x.sideLeft, y.sideMid, x.sideRight, y.sideMid, x.sideRight, y.sideLower],
-        [x.innerRib, y.ribLower, x.sideLeft, y.sideMid, x.sideRight, y.sideMid, x.rightRib, y.ribLower],
-        [x.frontRight, y.frontTop, x.backRight, y.backTop, x.backRight, y.frontLip, x.sideRight, y.sideLower, x.sideRight, y.sideMid, x.rightRib, y.ribLower, x.rightRib, y.bottomInner, x.frontRight, y.bottom],
-        [x.left, y.frontTop, x.frontRight, y.frontTop, x.frontRight, y.bottom, x.innerLeft, y.bottom, x.innerLeft, y.frontLip, x.left, y.frontLip],
-        [x.left, y.frontTop, x.backLeft, y.backTop, x.backRight, y.backTop, x.frontRight, y.frontTop],
-      ];
-
-      const dimLines = [
-        [x.innerLeft, y.bottom, x.innerLeft, y.bottom + 30],
-        [x.frontRight, y.bottom, x.frontRight, y.bottom + 30],
-        [x.innerLeft - 5, y.bottom + 25, x.frontRight + 5, y.bottom + 25],
-        [x.backRight, y.backTop, x.backRight + 26, y.backTop],
-        [x.sideRight, y.sideMid, x.backRight + 26, y.sideMid],
-        [x.backRight + 21, y.backTop - 5, x.backRight + 21, y.sideMid + 5],
-        [x.frontRight, y.bottom, x.frontRight + 19, y.bottom + 19],
-        [x.backRight, y.frontLip, x.backRight + 19, y.frontLip + 19],
-        [x.frontRight + 13, y.bottom + 14, x.backRight + 13, y.frontLip + 14],
-      ];
-
-      const labelData = [
-        { id: 'labelB', text: `b=${drawB}`, x: (x.innerLeft + x.frontRight) / 2 - 18, y: y.bottom + 34, rotation: 0 },
-        { id: 'labelH', text: `h=${drawH}`, x: x.backRight + 33, y: (y.backTop + y.sideMid) / 2 - 9, rotation: 0 },
-        {
-          id: 'labelL',
-          text: `l=${drawL}`,
-          x: (x.frontRight + x.backRight) / 2 + 30,
-          y: (y.bottom + y.frontLip) / 2 + 16,
-          rotation: (Math.atan2(y.frontLip - y.bottom, x.backRight - x.frontRight) * 180) / Math.PI,
-        },
-      ];
-
-      const allPoints = [...polygons, ...dimLines].flatMap((points) => {
-        const pairs: Array<[number, number]> = [];
-        for (let i = 0; i < points.length; i += 2) pairs.push([points[i], points[i + 1]]);
-        return pairs;
+      L_AFFECTED_POINTS.forEach((key) => {
+        points[key] = movePoint(points[key], lVector, lShift);
       });
-      const minX = Math.min(...allPoints.map(([px]) => px));
-      const maxX = Math.max(...allPoints.map(([px]) => px));
-      const minY = Math.min(...allPoints.map(([, py]) => py));
-      const maxY = Math.max(...allPoints.map(([, py]) => py));
+      H_AFFECTED_POINTS.forEach((key) => {
+        points[key] = movePoint(points[key], hVector, hShift);
+      });
+      const bOffsetLength = (drawB / DEFAULT_B) * BASE_B_OFFSET_LENGTH;
+      points.P9 = movePoint(points.P4, bVector, bOffsetLength);
+      points.P17 = movePoint(points.P11, bVector, bOffsetLength);
+
+      const hStart = midpoint(points.P4, points.P11);
+      const hEnd = midpoint(points.P15, points.P6);
+      const screenPoint = (point: ModelPoint): [number, number] => [point.x, -point.y];
+      const linePoints = (a: ModelPoint, b: ModelPoint) => [...screenPoint(a), ...screenPoint(b)];
+
+      const getAnchoredDimension = (
+        a: ModelPoint,
+        b: ModelPoint,
+        label: string,
+        value: number,
+        tickAngle: number,
+        tickLength = 2.75,
+        labelOffsetX = 0,
+        labelOffsetY = 0,
+        labelRotation?: number,
+      ) => {
+        const [x1, y1] = screenPoint(a);
+        const [x2, y2] = screenPoint(b);
+        const tickVector = direction(tickAngle);
+        const tickX = tickVector.x * tickLength;
+        const tickY = -tickVector.y * tickLength;
+        const dimX1 = x1 + tickX;
+        const dimY1 = y1 + tickY;
+        const dimX2 = x2 + tickX;
+        const dimY2 = y2 + tickY;
+        const dx = dimX2 - dimX1;
+        const dy = dimY2 - dimY1;
+
+        return {
+          line: [dimX1, dimY1, dimX2, dimY2],
+          tick1: [x1, y1, dimX1, dimY1],
+          tick2: [x2, y2, dimX2, dimY2],
+          label: {
+            text: `${label}=${value}`,
+            x: (dimX1 + dimX2) / 2 + labelOffsetX,
+            y: (dimY1 + dimY2) / 2 + labelOffsetY,
+            rotation: labelRotation ?? (Math.atan2(dy, dx) * 180) / Math.PI,
+          },
+        };
+      };
+
+      const dimensions = [
+        getAnchoredDimension(points.P1, points.P12, 'l', drawL, -30, 3.2, .05, 1, -30),
+        getAnchoredDimension(hStart, hEnd, 'h', drawH, 0, 3, 1.3, -1.5, 90),
+        getAnchoredDimension(points.P11, points.P17, 'b', drawB, 30, 3.2, 0, -2, 30),
+      ];
+
+      const drawablePointPairs: Array<[number, number]> = [
+        ...SOLID_LINES.flatMap(([from, to]) => [screenPoint(points[from]), screenPoint(points[to])]),
+        screenPoint(points[DASHED_LINE[0]]),
+        screenPoint(points[DASHED_LINE[1]]),
+        ...dimensions.flatMap((dimension) => {
+          const pairs: Array<[number, number]> = [];
+          [dimension.line, dimension.tick1, dimension.tick2].forEach((line) => {
+            for (let i = 0; i < line.length; i += 2) pairs.push([line[i], line[i + 1]]);
+          });
+          pairs.push([dimension.label.x, dimension.label.y]);
+          return pairs;
+        }),
+      ];
+      const minX = Math.min(...drawablePointPairs.map(([x]) => x));
+      const maxX = Math.max(...drawablePointPairs.map(([x]) => x));
+      const minY = Math.min(...drawablePointPairs.map(([, y]) => y));
+      const maxY = Math.max(...drawablePointPairs.map(([, y]) => y));
       const W = stageRef.current.width();
       const H = stageRef.current.height();
-      const padding = 56;
+      const padding = 66;
       const fitScale = Math.min((W - padding * 2) / (maxX - minX), (H - padding * 2) / (maxY - minY));
-      const scale = clamp(fitScale, 0.35, 1.65);
+      const scale = clamp(fitScale, 7, 22);
       const offsetX = W / 2 - ((minX + maxX) / 2) * scale;
-      const offsetY = H / 2 - ((minY + maxY) / 2) * scale + 16;
-
+      const offsetY = H / 2 - ((minY + maxY) / 2) * scale + 10;
       const group = shapeGroupRef.current;
+
       group.destroyChildren();
       group.position({ x: offsetX, y: offsetY });
       group.scale({ x: scale, y: scale });
 
-      polygons.forEach((points, index) => {
+      SOLID_LINES.forEach(([from, to], index) => {
         group.add(new window.Konva.Line({
-          id: `beamPolygon${index}`,
-          points,
-          fill: '#ffffff',
+          id: `solidLine${index}`,
+          points: linePoints(points[from], points[to]),
           stroke: SHAPE_STROKE,
-          strokeWidth: 2,
-          closed: true,
+          strokeWidth: 2 / scale,
+          lineCap: 'round',
           lineJoin: 'round',
         }));
       });
 
-      dimLines.forEach((points, index) => {
-        group.add(new window.Konva.Line({
-          id: `dimLine${index}`,
-          points,
-          stroke: DIM_STROKE,
-          strokeWidth: 2,
-          lineCap: 'round',
-        }));
-      });
+      group.add(new window.Konva.Line({
+        id: 'dashedLineL18',
+        points: linePoints(points[DASHED_LINE[0]], points[DASHED_LINE[1]]),
+        stroke: DASH_STROKE,
+        strokeWidth: 1.8 / scale,
+        dash: [0.8, 0.6],
+        lineCap: 'round',
+      }));
 
-      labelData.forEach((item) => {
+      dimensions.forEach((dimension, index) => {
+        [dimension.line, dimension.tick1, dimension.tick2].forEach((line, lineIndex) => {
+          group.add(new window.Konva.Line({
+            id: `dimLine${index}-${lineIndex}`,
+            points: line,
+            stroke: DIM_STROKE,
+            strokeWidth: 2 / scale,
+            lineCap: 'round',
+          }));
+        });
         group.add(new window.Konva.Text({
-          id: item.id,
-          x: item.x,
-          y: item.y,
-          text: item.text,
-          fontSize: 14,
+          id: `dimLabel${index}`,
+          x: dimension.label.x,
+          y: dimension.label.y,
+          text: dimension.label.text,
+          fontSize: 14 / scale,
           fontFamily: 'sans-serif',
-          fill: '#111827',
+          fill: DIM_LABEL_FILL,
           fontStyle: 'bold',
-          rotation: item.rotation,
+          rotation: dimension.label.rotation,
         }));
       });
 
@@ -217,7 +295,7 @@ const DiagramPanel: React.FC<ModuleDiagramProps> = ({ params, isKonvaLoaded }) =
       }}
     >
       <div className="absolute top-4 left-4 bg-white/80 backdrop-blur px-3 py-1 rounded shadow text-sm font-semibold text-gray-800 z-10 border border-gray-200">
-        结构梁双向受力示意图（图形显示暂时有误，不影响计算）
+        结构梁双向受力示意图
       </div>
       <div ref={konvaContainerRef} className="flex-1 w-full cursor-crosshair" style={{ minHeight: 0 }} />
     </div>
