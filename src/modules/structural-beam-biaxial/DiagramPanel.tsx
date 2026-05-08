@@ -158,6 +158,8 @@ const DiagramPanel: React.FC<ModuleDiagramProps> = ({ params, isKonvaLoaded }) =
 
       const hStart = midpoint(points.P4, points.P11);
       const hEnd = midpoint(points.P15, points.P6);
+      const lStart = midpoint(points.P1, points.P3);
+      const lEnd = midpoint(points.P12, points.P13);
       const screenPoint = (point: ModelPoint): [number, number] => [point.x, -point.y];
       const linePoints = (a: ModelPoint, b: ModelPoint) => [...screenPoint(a), ...screenPoint(b)];
 
@@ -198,7 +200,7 @@ const DiagramPanel: React.FC<ModuleDiagramProps> = ({ params, isKonvaLoaded }) =
       };
 
       const dimensions = [
-        getAnchoredDimension(points.P1, points.P12, 'l', drawL, -30, 3.2, .05, 1, -30),
+        getAnchoredDimension(lStart, lEnd, 'l', drawL, -30, 3.2, .05, 1, -30),
         getAnchoredDimension(hStart, hEnd, 'h', drawH, 0, 3, 1.3, -1.5, 90),
         getAnchoredDimension(points.P11, points.P17, 'b', drawB, 30, 3.2, 0, -2, 30),
       ];
