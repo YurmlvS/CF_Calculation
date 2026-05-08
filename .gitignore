@@ -6,3 +6,5 @@ src-tauri/target/
 .env
 vite-dev.log
 vite-dev.err.log
+vite-dev-1421.log
+vite-dev-1421.err.log

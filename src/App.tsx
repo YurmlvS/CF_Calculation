@@ -65,9 +65,15 @@ export default function App() {
     (key: string) =>
       (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
-        setParams((prev) => ({ ...prev, [key]: val === '' ? '' : Number(val) }));
+        const fieldValue = val === '' ? '' : Number(val);
+        const field = activeModule.paramFields.find((item) => item.key === key);
+        setParams((prev) => ({
+          ...prev,
+          [key]: fieldValue,
+          ...(field?.getPatchOnChange?.(fieldValue, prev) ?? {}),
+        }));
       },
-    [],
+    [activeModule],
   );
 
   const handleParamPatch = useCallback((patch: Record<string, ParamValue>) => {

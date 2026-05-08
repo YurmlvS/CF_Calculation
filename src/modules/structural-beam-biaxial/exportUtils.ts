@@ -27,7 +27,6 @@ const FONTS = {
 
 function formatExportTimestamp(date = new Date()): string {
   const pad = (value: number) => String(value).padStart(2, '0');
-
   return [
     date.getFullYear(),
     pad(date.getMonth() + 1),
@@ -57,20 +56,42 @@ function rebarLabel(axis: FlexuralAxisResult): string {
   return `${axis.rebarCount}Φ${axis.rebarDiameter}`;
 }
 
+function createTextRun(text: string, bold = false, script?: 'sub' | 'super'): TextRun {
+  return new TextRun({
+    text,
+    bold,
+    size: FONT_SIZES.NORMAL,
+    subScript: script === 'sub',
+    superScript: script === 'super',
+    font: {
+      ascii: FONTS.ENGLISH,
+      eastAsia: FONTS.CHINESE,
+      hint: 'eastAsia',
+    },
+  });
+}
+
+function richRuns(text: string, bold = false): TextRun[] {
+  const runs: TextRun[] = [];
+  const re = /([_^])(?:\{([^}]+)\}|([A-Za-z0-9]+))/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = re.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      runs.push(createTextRun(text.slice(lastIndex, match.index), bold));
+    }
+    runs.push(createTextRun(match[2] ?? match[3], bold, match[1] === '_' ? 'sub' : 'super'));
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) runs.push(createTextRun(text.slice(lastIndex), bold));
+  return runs.length > 0 ? runs : [createTextRun('', bold)];
+}
+
 function paraText(text: string, bold = false): Paragraph {
   return new Paragraph({
-    children: [
-      new TextRun({
-        text,
-        bold,
-        size: FONT_SIZES.NORMAL,
-        font: {
-          ascii: FONTS.ENGLISH,
-          eastAsia: FONTS.CHINESE,
-          hint: 'eastAsia',
-        },
-      }),
-    ],
+    children: richRuns(text, bold),
     spacing: { after: 100 },
   });
 }
@@ -162,6 +183,27 @@ function getSteelLabel(params: CalcParams): string {
     : '自定义';
 }
 
+function axisParagraphs(axis: FlexuralAxisResult, label: string, fc: number, fy: number): Paragraph[] {
+  const moment = axis.axis === 'x' ? 'M_x' : 'M_y';
+  const area = axis.axis === 'x' ? 'A_sx' : 'A_sy';
+  const provided = axis.axis === 'x' ? 'A_ux' : 'A_uy';
+  const widthName = axis.axis === 'x' ? 'b' : 'h';
+  const rho = axis.axis === 'x' ? 'ρ_x' : 'ρ_y';
+
+  return [
+    paraText(label, true),
+    paraText(`截面抵抗矩系数：a_s = ${moment}/(α_1 f_c ${widthName} h_0^2) = ${fmt(axis.moment)}×10^6/(1×${fc}×${fmtArea(axis.sectionWidth)}×${fmtArea(axis.h0)}^2) = ${fmt(axis.alphaS, 3)}`),
+    paraText(`相对受压区高度：ξ = 1 - sqrt(1 - 2a_s) = ${fmt(axis.xi, 3)} ${axis.xi < axis.xiB ? '<' : '≥'} ξ_b = ${axis.xiB}`),
+    paraText(`内力臂系数：γ_s = 0.5×(1 + sqrt(1 - 2a_s)) = ${fmt(axis.gammaS, 3)}`),
+    paraText(`纵向受拉钢筋截面面积：${area} = ${moment}/(f_y γ_s h_0) = ${fmt(axis.moment)}×10^6/(${fy}×${fmt(axis.gammaS, 3)}×${fmtArea(axis.h0)}) = ${fmtArea(axis.requiredArea)} mm^2`),
+    paraText(`配筋验算：${provided} = ${fmtArea(axis.providedArea)} mm^2 ${axis.areaOk ? '≥' : '<'} ${fmtArea(axis.requiredArea)} mm^2，${rebarLabel(axis)}，${axis.areaOk ? '满足' : '不满足'}`),
+    paraText(axis.arrangementWidth === null
+      ? '自定义钢筋，未进行排布宽度自动验算。'
+      : `排布宽度：${axis.rebarCount}×${axis.rebarDiameter}+${Math.max(0, (axis.rebarCount ?? 1) - 1)}×25+2×(20+8) = ${fmtArea(axis.arrangementWidth)} mm ${axis.fits ? '<' : '≥'} ${fmtArea(axis.fitWidth)} mm，${axis.fits ? '满足' : '不满足'}`),
+    paraText(`${rho} = ${fmtArea(axis.providedArea)}/(${fmtArea(axis.sectionWidth)}×${fmtArea(axis.h0)}) = ${pct(axis.rho)}；ρ_min,1 = 0.45(f_t/f_y)(h/h_0) = ${pct(axis.rhoMinFt)}；ρ_min,2 = 0.2%(h/h_0) = ${pct(axis.rhoMinBase)}，${axis.rhoOk ? '满足' : '不满足'}`),
+  ];
+}
+
 async function buildWordParagraphs(calcResult: StructuralBeamBiaxialResult, params: CalcParams): Promise<Paragraph[]> {
   const { input, worst, flexural, shear } = calcResult;
   const x = flexural.x;
@@ -183,79 +225,55 @@ async function buildWordParagraphs(calcResult: StructuralBeamBiaxialResult, para
     ]
     : [];
 
+  const a = fmt(worst.horizontalA);
+  const horizontalB = fmt(worst.horizontalB);
+  const l = fmt(worst.effectiveSpanM);
+  const F = input.F;
+
   return [
     new Paragraph({
-      text: '两端固支梁双向受弯复核',
+      text: '两端固支梁双向受力验算书',
       heading: HeadingLevel.HEADING_1,
       alignment: AlignmentType.CENTER,
     }),
     heading('基本参数情况'),
     ...diagramParagraphs,
-    paraText(`混凝土 ${getConcreteLabel(params)}`),
-    paraText(`钢筋 ${getSteelLabel(params)}`),
-    paraText(`截面 b=${input.b} mm  h=${input.h} mm`),
-    paraText(`有效高度 h0=${fmtArea(x.h0)} mm (有利方向）`),
-    paraText(`有效高度 h0'=${fmtArea(y.h0)} mm(不利方向）`),
-    paraText(`梁长 l=${fmt(worst.effectiveSpanM)} m`),
-    paraText(`竖向均布荷载 q= ${input.q} kN/m`),
-    paraText(`水平力 F= ${input.F} kN`),
-    paraText(`轴心抗压强度fc=${input.fc} N/mm2`),
-    paraText(`混凝土的抗拉强度标准值ft=${input.ft} N/mm2`),
-    paraText(`钢筋强度设计值fy=${input.fy} N/mm2`),
+    paraText(`混凝土：${getConcreteLabel(params)}`),
+    paraText(`钢筋：${getSteelLabel(params)}`),
+    paraText(`截面：b = ${input.b} mm，h = ${input.h} mm`),
+    paraText(`梁长：l = ${fmt(worst.effectiveSpanM)} m`),
+    paraText(`受力点位：a = ${a} m，b = l - a = ${horizontalB} m`),
+    paraText(`竖向均布荷载：q = ${input.q} kN/m`),
+    paraText(`水平集中力：F = ${input.F} kN`),
+    paraText(`轴心抗压强度：f_c = ${input.fc} N/mm^2`),
+    paraText(`混凝土抗拉强度标准值：f_t = ${input.ft} N/mm^2`),
+    paraText(`钢筋强度设计值：f_y = ${input.fy} N/mm^2`),
 
-    heading('1.最不利点判定'),
-    paraText('均布荷载作用下'),
-    paraText(`支座弯矩 M1 = -ql2/12 =${fmt(worst.verticalSupportMoment)} kN·m`),
-    paraText(`跨中弯矩 M2 = ql2/24 = ${fmt(worst.verticalMidMoment)} kN·m`),
-    paraText(`支座剪力 V1 = ql/2 = ${fmt(worst.verticalShear, 0)} kN`),
-    paraText('水平力作用下 (以作用在中点为例）'),
-    paraText(`支座弯矩 M1 = -Fab2/l2 或 Fba2/l2 =${fmt(worst.horizontalSupportMoment)} kN·m`),
-    paraText(`跨中弯矩 M2 = Fa2b2/l3 = ${fmt(worst.horizontalMidMoment)} kN·m`),
-    paraText(`支座剪力 V1 =(Fb2/l2)*(1+2a/l) 或 -(Fa2/l2)*(1+2b/l) = ${fmt(worst.horizontalShear, 0)} kN`),
-    paraText(`得到最不利截面为${worst.worstSection === 'support' ? '支座处' : '跨中处'}`),
-    paraText(`Mx = max[Mx1,Mx2]=${fmt(worst.Mx)} kN·m`),
-    paraText(`My = max[My1,My2]=${fmt(worst.My)} kN·m`),
-    paraText(`V= max[V1,V2]=${fmt(worst.V, 0)} kN`),
+    heading('1. 最不利点判定'),
+    paraText('均布荷载作用下：'),
+    paraText(`支座弯矩 M_x1 = -q l^2/12 = -${input.q}×${l}^2/12 = ${fmt(worst.verticalSupportMoment)} kN·m`),
+    paraText(`跨中弯矩 M_x2 = q l^2/24 = ${input.q}×${l}^2/24 = ${fmt(worst.verticalMidMoment)} kN·m`),
+    paraText(`支座剪力 V_1 = ql/2 = ${input.q}×${l}/2 = ${fmt(worst.verticalShear)} kN`),
+    paraText('水平力作用下：'),
+    paraText(`b = l - a = ${horizontalB} m`),
+    paraText(`支座弯矩 M_y1 = max[-F a b^2/l^2, F b a^2/l^2] = max[-${F}×${a}×${horizontalB}^2/${l}^2, ${F}×${horizontalB}×${a}^2/${l}^2] = ${fmt(worst.horizontalSupportMoment)} kN·m`),
+    paraText(`集中力处弯矩 M_y2 = F a^2 b^2/l^3 = ${F}×${a}^2×${horizontalB}^2/${l}^3 = ${fmt(worst.horizontalMidMoment)} kN·m`),
+    paraText(`支座剪力 V_2 = max[|F b^2/l^2(1+2a/l)|, |-F a^2/l^2(1+2b/l)|] = ${fmt(worst.horizontalShear)} kN`),
+    paraText(`得到最不利截面为${worst.worstSection === 'support' ? '支座处' : '集中力处'}。`),
+    paraText(`M_x = max(|M_x1|, |M_x2|) = ${fmt(worst.Mx)} kN·m`),
+    paraText(`M_y = max(|M_y1|, |M_y2|) = ${fmt(worst.My)} kN·m`),
+    paraText(`V = max(|V_1|, |V_2|) = ${fmt(worst.V)} kN`),
 
-    heading('2.纵向受拉钢筋的截面面积计算'),
-    paraText('x方向'),
-    paraText('截面抵抗矩系数计算：'),
-    paraText(`as=Mx/(a1*fc*b*h02) =${fmt(worst.Mx)}*106/(1*${input.fc}*${input.b}*${fmtArea(x.h0)}2)=${fmt(x.alphaS, 2)}`),
-    paraText('相对受压区高度计算'),
-    paraText(`ξ=1-sqrt(1-2as)=${fmt(x.xi, 3)}<ξb = ${x.xiB}`),
-    paraText('内力矩的内力臂系数'),
-    paraText(`Υs=0.5*(1+sqrt(1-2as))=${fmt(x.gammaS, 3)}`),
-    paraText('纵向受拉钢筋的截面面积'),
-    paraText(`Asx=M/(fy*Υs*h0)=${fmt(worst.Mx)}*106/(${input.fy}*${fmt(x.gammaS, 3)}*${fmtArea(x.h0)})=${fmtArea(x.requiredArea)} mm2`),
-    paraText('y方向'),
-    paraText('截面抵抗矩系数计算：'),
-    paraText(`as=My/(a1*fc*b*h02) =${fmt(worst.My)}*106/(1*${input.fc}*${fmtArea(y.sectionWidth)}*${fmtArea(y.h0)}2)=${fmt(y.alphaS, 3)}`),
-    paraText('相对受压区高度计算'),
-    paraText(`ξ=1-sqrt(1-2as)=${fmt(y.xi, 3)}<ξb = ${y.xiB}`),
-    paraText('内力矩的内力臂系数'),
-    paraText(`Υs=0.5*(1+sqrt(1-2as))=${fmt(y.gammaS, 3)}`),
-    paraText('纵向受拉钢筋的截面面积'),
-    paraText(`Asy=M/(fy*Υs*h0)=${fmt(worst.My)}*106/(${input.fy}*${fmt(y.gammaS, 3)}*${fmtArea(y.h0)})=${fmtArea(y.requiredArea)} mm2`),
-    paraText('对x、y两个方向分别进行配筋得到'),
-    paraText(`绕 x：${rebarLabel(x)}，Aux=${fmtArea(input.Aux)} mm² ${x.areaOk ? '>' : '<'} ${fmtArea(x.requiredArea)} mm²`),
-    paraText(`绕 y：${rebarLabel(y)}，Auy=${fmtArea(input.Auy)} mm² ${y.areaOk ? '>' : '<'} ${fmtArea(y.requiredArea)} mm²`),
-    paraText(`验算在b=${fmtArea(x.fitWidth)} mm 宽度内是否放得下：`),
-    paraText(x.arrangementWidth === null
-      ? '自定义钢筋，未进行排布宽度自动验算。'
-      : `${x.rebarCount}*${x.rebarDiameter}+${Math.max(0, (x.rebarCount ?? 1) - 1)}*25+2*（20+8）=${fmtArea(x.arrangementWidth)} mm < ${fmtArea(x.fitWidth)} mm ${x.fits ? '可以' : '不可以'}`),
-    paraText(`ρ=${fmtArea(input.Aux)}/(${fmtArea(x.sectionWidth)}*${fmtArea(x.h0)})=${pct(x.rho)} > ρmin *h/h0 = 0.45(ft/fy)*(h/h0) = ${pct(x.rhoMinFt, 1)},同时ρ>0.2%*h/h0=${pct(x.rhoMinBase)} ${x.rhoOk ? '可以' : '不可以'}`),
-    paraText(`验算在b=${fmtArea(y.fitWidth)} mm 宽度内是否放得下：`),
-    paraText(y.arrangementWidth === null
-      ? '自定义钢筋，未进行排布宽度自动验算。'
-      : `${y.rebarCount}*${y.rebarDiameter}+${Math.max(0, (y.rebarCount ?? 1) - 1)}*25+2*（20+8）=${fmtArea(y.arrangementWidth)} mm < ${fmtArea(y.fitWidth)} mm ${y.fits ? '可以' : '不可以'}`),
-    paraText(`ρ=${fmtArea(input.Auy)}/(${fmtArea(y.h0)}*${fmtArea(y.sectionWidth)})=${pct(y.rho)} > ρmin *h/h0 = 0.45(ft/fy)*(h/h0) = ${pct(y.rhoMinFt)},同时ρ>0.2%*h/h0=${pct(y.rhoMinBase)} ${y.rhoOk ? '可以' : '不可以'}`),
+    heading('2. 纵向受拉钢筋截面面积计算'),
+    ...axisParagraphs(x, 'x 方向', input.fc, input.fy),
+    ...axisParagraphs(y, 'y 方向', input.fc, input.fy),
 
-    heading('3.斜截面受剪验算'),
-    paraText('截面限制条件'),
-    paraText(`0.25fcbh0=0.25*${input.fc}*${input.b}*${fmtArea(x.h0)}=${fmt(shear.limitCapacity, 1)}>${fmt(shear.shear, 0)} ${shear.limitOk ? '满足' : '不满足'}`),
-    paraText('受剪承载力'),
-    paraText(`0.7ftbh0=0.7*${input.ft}*${input.b}*${fmtArea(x.h0)}=${fmt(shear.concreteCapacity, 1)}>${fmt(shear.shear, 0)} ${shear.concreteOk ? '满足' : '不满足'}`),
-    paraText(shear.concreteOk ? '混凝土即可承担剪力，箍筋按照构造配置' : '混凝土受剪承载力不足，应另行配置箍筋并复核'),
+    heading('3. 斜截面受剪验算'),
+    paraText('截面限制条件：'),
+    paraText(`0.25 f_c b h_0 = 0.25×${input.fc}×${input.b}×${fmtArea(x.h0)}/1000 = ${fmt(shear.limitCapacity, 1)} kN ${shear.limitOk ? '>' : '≤'} ${fmt(shear.shear)} kN，${shear.limitOk ? '满足' : '不满足'}`),
+    paraText('受剪承载力：'),
+    paraText(`0.7 f_t b h_0 = 0.7×${input.ft}×${input.b}×${fmtArea(x.h0)}/1000 = ${fmt(shear.concreteCapacity, 1)} kN ${shear.concreteOk ? '>' : '≤'} ${fmt(shear.shear)} kN，${shear.concreteOk ? '满足' : '不满足'}`),
+    paraText(shear.concreteOk ? '混凝土即可承担剪力，箍筋按构造配置。' : '混凝土受剪承载力不足，应另行配置箍筋并复核。'),
   ];
 }
 

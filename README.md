@@ -279,6 +279,12 @@ Y 撑规则：
 }
 ```
 
+结构梁双向受力验算补充：
+
+- `/api/structural-beam-biaxial/schema` 会返回新增输入 `a` 和只读显示字段 `horizontalB`。
+- `/api/structural-beam-biaxial/calculate` 的 `params.a` 表示水平集中力作用点位，必须满足 `0 < a < l`；服务端返回的 `normalizedParams.horizontalB = l - a`。
+- 水平力作用下支座弯矩按 `M_y1 = max[-F a b^2/l^2, F b a^2/l^2]`，集中力处弯矩按 `M_y2 = F a^2 b^2/l^3` 参与验算。
+
 ## Docker 部署
 
 当前 Docker 配置会同时部署前端静态页面和 Node.js API 服务：

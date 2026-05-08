@@ -68,7 +68,7 @@ const NoteLine: React.FC<{ children: React.ReactNode; muted?: boolean }> = ({ ch
 
 function targetLabel(calcTarget: string): string {
   if (calcTarget === 'worst') return '最不利点判定';
-  if (calcTarget === 'rebar') return '纵向受拉钢筋的截面面积计算';
+  if (calcTarget === 'rebar') return '纵向受拉钢筋截面面积计算';
   if (calcTarget === 'shear') return '斜截面受剪验算';
   return '全部计算';
 }
@@ -83,20 +83,21 @@ function renderWorstSection(result: StructuralBeamBiaxialResult) {
   return (
     <div className="bg-gray-50 p-4 rounded border border-gray-100 overflow-x-auto">
       <NoteLine>均布荷载作用下：</NoteLine>
-      <FormulaLine tex={`M_1=-\\frac{ql^2}{12}=-\\frac{${q}\\times${l}^2}{12}=${fmt(w.verticalSupportMoment)}\\,\\mathrm{kN\\cdot m}`} />
-      <FormulaLine tex={`M_2=\\frac{ql^2}{24}=\\frac{${q}\\times${l}^2}{24}=${fmt(w.verticalMidMoment)}\\,\\mathrm{kN\\cdot m}`} />
+      <FormulaLine tex={`M_{x1}=-\\frac{ql^2}{12}=-\\frac{${q}\\times${l}^2}{12}=${fmt(w.verticalSupportMoment)}\\,\\mathrm{kN\\cdot m}`} />
+      <FormulaLine tex={`M_{x2}=\\frac{ql^2}{24}=\\frac{${q}\\times${l}^2}{24}=${fmt(w.verticalMidMoment)}\\,\\mathrm{kN\\cdot m}`} />
       <FormulaLine tex={`V_1=\\frac{ql}{2}=\\frac{${q}\\times${l}}{2}=${fmt(w.verticalShear)}\\,\\mathrm{kN}`} />
 
-      <NoteLine>水平力作用下（以作用在中点为例）：</NoteLine>
-      <FormulaLine tex={`a=b=\\frac{l}{2}=${a}\\,\\mathrm{m}`} />
-      <FormulaLine tex={`M_1=-\\frac{Fab^2}{l^2}=-\\frac{${F}\\times${a}\\times${b}^2}{${l}^2}=${fmt(w.horizontalSupportMoment)}\\,\\mathrm{kN\\cdot m}`} />
-      <FormulaLine tex={`M_2=\\frac{Fa^2b^2}{l^3}=\\frac{${F}\\times${a}^2\\times${b}^2}{${l}^3}=${fmt(w.horizontalMidMoment)}\\,\\mathrm{kN\\cdot m}`} />
-      <FormulaLine tex={`V_2=\\frac{Fb^2}{l^2}\\left(1+\\frac{2a}{l}\\right)=${fmt(w.horizontalShear)}\\,\\mathrm{kN}`} />
+      <NoteLine>水平力作用下：</NoteLine>
+      <FormulaLine tex={`b=l-a=${b}\\,\\mathrm{m}`} />
+      <FormulaLine tex={`M_{y1}=\\max\\left[-\\frac{Fab^2}{l^2},\\frac{Fba^2}{l^2}\\right] `} />
+      <FormulaLine tex={`=\\max\\left[-\\frac{${F}\\times${a}\\times${b}^2}{${l}^2},\\frac{${F}\\times${b}\\times${a}^2}{${l}^2}\\right]=${fmt(w.horizontalSupportMoment)}\\,\\mathrm{kN\\cdot m}`} />
+      <FormulaLine tex={`M_{y2}=\\frac{Fa^2b^2}{l^3}=\\frac{${F}\\times${a}^2\\times${b}^2}{${l}^3}=${fmt(w.horizontalMidMoment)}\\,\\mathrm{kN\\cdot m}`} />
+      <FormulaLine tex={`V_2=\\max\\left(\\left|\\frac{Fb^2}{l^2}\\left(1+\\frac{2a}{l}\\right)\\right|,\\left|-\\frac{Fa^2}{l^2}\\left(1+\\frac{2b}{l}\\right)\\right|\\right)=${fmt(w.horizontalShear)}\\,\\mathrm{kN}`} />
 
-      <NoteLine>得到最不利截面为{w.worstSection === 'support' ? '支座处' : '跨中处'}：</NoteLine>
+      <NoteLine>得到最不利截面为{w.worstSection === 'support' ? '支座处' : '集中力处'}：</NoteLine>
       <FormulaLine tex={`M_x=\\max(|M_{x1}|,|M_{x2}|)=${fmt(w.Mx)}\\,\\mathrm{kN\\cdot m}`} />
       <FormulaLine tex={`M_y=\\max(|M_{y1}|,|M_{y2}|)=${fmt(w.My)}\\,\\mathrm{kN\\cdot m}`} />
-      <FormulaLine tex={`V=\\max(V_1,V_2)=${fmt(w.V)}\\,\\mathrm{kN}`} />
+      <FormulaLine tex={`V=\\max(|V_1|,|V_2|)=${fmt(w.V)}\\,\\mathrm{kN}`} />
     </div>
   );
 }
@@ -122,11 +123,11 @@ function renderFlexuralAxis(axis: FlexuralAxisResult, fc: number, fy: number, ft
         <NoteLine>相对受压区高度计算：</NoteLine>
         <FormulaLine tex={`\\xi=1-\\sqrt{1-2a_s}=${fmt(axis.xi, 3)}${axis.xi < axis.xiB ? '<' : '\\ge'}\\xi_b=${axis.xiB}`} />
 
-        <NoteLine>内力矩的内力臂系数：</NoteLine>
-        <FormulaLine tex={`\\Upsilon_s=0.5\\left(1+\\sqrt{1-2a_s}\\right)=${fmt(axis.gammaS, 3)}`} />
+        <NoteLine>内力臂系数：</NoteLine>
+        <FormulaLine tex={`\\gamma_s=0.5\\left(1+\\sqrt{1-2a_s}\\right)=${fmt(axis.gammaS, 3)}`} />
 
-        <NoteLine>纵向受拉钢筋的截面面积：</NoteLine>
-        <FormulaLine tex={`${area}=\\frac{${moment}}{f_y\\Upsilon_s h_0}=\\frac{${fmt(axis.moment)}\\times10^6}{${fy}\\times${fmt(axis.gammaS, 3)}\\times${fmtArea(axis.h0)}}=${fmtArea(axis.requiredArea)}\\,\\mathrm{mm^2}`} />
+        <NoteLine>纵向受拉钢筋截面面积：</NoteLine>
+        <FormulaLine tex={`${area}=\\frac{${moment}}{f_y\\gamma_s h_0}=\\frac{${fmt(axis.moment)}\\times10^6}{${fy}\\times${fmt(axis.gammaS, 3)}\\times${fmtArea(axis.h0)}}=${fmtArea(axis.requiredArea)}\\,\\mathrm{mm^2}`} />
 
         <NoteLine>配筋验算：</NoteLine>
         <FormulaLine tex={`${provided}=${fmtArea(axis.providedArea)}\\,\\mathrm{mm^2}${axis.areaOk ? '\\ge' : '<'}${fmtArea(axis.requiredArea)}\\,\\mathrm{mm^2}`} />
@@ -178,7 +179,7 @@ function renderShearSection(result: StructuralBeamBiaxialResult) {
       </p>
 
       <p className="text-sm text-gray-700 mt-2">
-        {s.concreteOk ? '混凝土即可承担剪力，箍筋按照构造配置。' : '混凝土受剪承载力不足，应另行配置箍筋并复核。'}
+        {s.concreteOk ? '混凝土即可承担剪力，箍筋按构造配置。' : '混凝土受剪承载力不足，应另行配置箍筋并复核。'}
       </p>
     </div>
   );
@@ -217,13 +218,15 @@ const ResultPanel: React.FC<ModuleResultProps> = ({ params, calcResult, calcTarg
               <li>梁高 h = {params.h} mm</li>
               <li>梁宽 b = {params.b} mm</li>
               <li>梁长 l = {params.l} m</li>
+              <li>受力点位 a = {params.a} m</li>
+              <li>受力点右段 b = {result.input.horizontalB} m</li>
               <li>竖向均布荷载 q = {params.q} kN/m</li>
               <li>水平集中力 F = {params.F} kN</li>
-              <li>轴心抗压强度 <SymbolText base="f" sub="c" /> = {params.fc} N/mm²</li>
-              <li>混凝土抗拉强度标准值 <SymbolText base="f" sub="t" /> = {params.ft} N/mm²</li>
-              <li>钢筋强度设计值 <SymbolText base="f" sub="y" /> = {params.fy} N/mm²</li>
-              <li>X轴钢筋 {rebarLabel(result.flexural.x)}，<SymbolText base="A" sub="ux" /> = {params.Aux} mm²</li>
-              <li>Y轴钢筋 {rebarLabel(result.flexural.y)}，<SymbolText base="A" sub="uy" /> = {params.Auy} mm²</li>
+              <li>轴心抗压强度 <SymbolText base="f" sub="c" /> = {params.fc} N/mm<sup>2</sup></li>
+              <li>混凝土抗拉强度标准值 <SymbolText base="f" sub="t" /> = {params.ft} N/mm<sup>2</sup></li>
+              <li>钢筋强度设计值 <SymbolText base="f" sub="y" /> = {params.fy} N/mm<sup>2</sup></li>
+              <li>X轴钢筋 {rebarLabel(result.flexural.x)}，<SymbolText base="A" sub="ux" /> = {params.Aux} mm<sup>2</sup></li>
+              <li>Y轴钢筋 {rebarLabel(result.flexural.y)}，<SymbolText base="A" sub="uy" /> = {params.Auy} mm<sup>2</sup></li>
             </ul>
           ) : (
             <span className="text-xs text-gray-400">请填写完整参数以生成计算过程...</span>
@@ -245,7 +248,7 @@ const ResultPanel: React.FC<ModuleResultProps> = ({ params, calcResult, calcTarg
 
         {result && showRebar && (
           <div className="mb-4">
-            <h4 className="text-sm font-semibold text-gray-600 mb-2">{showWorst ? 3 : 2}. 纵向受拉钢筋的截面面积计算</h4>
+            <h4 className="text-sm font-semibold text-gray-600 mb-2">{showWorst ? 3 : 2}. 纵向受拉钢筋截面面积计算</h4>
             <NoteLine muted>对 x、y 两个方向分别进行配筋验算。</NoteLine>
             {renderFlexuralAxis(result.flexural.x, result.input.fc, result.input.fy, result.input.ft)}
             {renderFlexuralAxis(result.flexural.y, result.input.fc, result.input.fy, result.input.ft)}
@@ -271,4 +274,3 @@ const ResultPanel: React.FC<ModuleResultProps> = ({ params, calcResult, calcTarg
 };
 
 export default ResultPanel;
-

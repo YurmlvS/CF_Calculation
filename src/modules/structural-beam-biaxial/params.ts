@@ -59,10 +59,38 @@ function buildRebarPatch(
   return { [areaKey]: getRebarArea(count, diameter) };
 }
 
+function calcHorizontalB(value: ParamValue, params: Record<string, ParamValue>, changedKey: 'l' | 'a'): Record<string, ParamValue> {
+  const l = changedKey === 'l' ? Number(value) : Number(params.l);
+  const a = changedKey === 'a' ? Number(value) : Number(params.a);
+
+  if (!Number.isFinite(l) || !Number.isFinite(a) || l <= 0 || a <= 0 || a >= l) {
+    return { horizontalB: '' };
+  }
+
+  return { horizontalB: Number((l - a).toFixed(6)) };
+}
+
 export const paramFields: ParamFieldDef[] = [
   { key: 'h', label: '梁高 h (mm)', placeholder: '例如: 500' },
   { key: 'b', label: '梁宽 b (mm)', placeholder: '例如: 250' },
-  { key: 'l', label: '梁长 l (m)', placeholder: '例如: 10' },
+  {
+    key: 'l',
+    label: '梁长 l (m)',
+    placeholder: '例如: 10',
+    getPatchOnChange: (value, params) => calcHorizontalB(value, params, 'l'),
+  },
+  {
+    key: 'a',
+    label: '受力点位 a (m)',
+    placeholder: '例如: 5',
+    getPatchOnChange: (value, params) => calcHorizontalB(value, params, 'a'),
+  },
+  {
+    key: 'horizontalB',
+    label: '受力点右段 b = l - a (m)',
+    placeholder: '由 l - a 自动计算',
+    readOnlyWhen: { key: 'horizontalB', notValue: '__never__' },
+  },
   { key: 'q', label: '竖向均布荷载 q (kN/m)', placeholder: '例如: 20' },
   { key: 'F', label: '水平集中力 F (kN)', placeholder: '例如: 50' },
   {
@@ -74,13 +102,13 @@ export const paramFields: ParamFieldDef[] = [
   },
   {
     key: 'fc',
-    label: '轴心抗压强度 f_c (N/mm²)',
+    label: '轴心抗压强度 f_c (N/mm^2)',
     placeholder: '例如: 14.3',
     readOnlyWhen: { key: 'concreteGrade', notValue: 'custom' },
   },
   {
     key: 'ft',
-    label: '混凝土的抗拉强度标准值 f_t (N/mm²)',
+    label: '混凝土抗拉强度标准值 f_t (N/mm^2)',
     placeholder: '例如: 1.43',
     readOnlyWhen: { key: 'concreteGrade', notValue: 'custom' },
   },
@@ -93,7 +121,7 @@ export const paramFields: ParamFieldDef[] = [
   },
   {
     key: 'fy',
-    label: '钢筋强度设计值 f_y (N/mm²)',
+    label: '钢筋强度设计值 f_y (N/mm^2)',
     placeholder: '例如: 360',
     readOnlyWhen: { key: 'steelGrade', notValue: 'custom' },
   },
@@ -116,7 +144,7 @@ export const paramFields: ParamFieldDef[] = [
   },
   {
     key: 'Aux',
-    label: 'X轴不同根数钢筋的计算截面面积 A_ux (mm²)',
+    label: 'X轴不同根数钢筋的计算截面面积 A_ux (mm^2)',
     placeholder: '例如: 1256',
     readOnlyWhen: { key: 'xRebarCount', notValue: 'custom' },
   },
@@ -139,7 +167,7 @@ export const paramFields: ParamFieldDef[] = [
   },
   {
     key: 'Auy',
-    label: 'Y轴不同根数钢筋的计算截面面积 A_uy (mm²)',
+    label: 'Y轴不同根数钢筋的计算截面面积 A_uy (mm^2)',
     placeholder: '例如: 1017',
     readOnlyWhen: { key: 'yRebarCount', notValue: 'custom' },
   },
@@ -149,6 +177,8 @@ export const defaultParams: Record<string, ParamValue> = {
   h: '',
   b: '',
   l: '',
+  a: '',
+  horizontalB: '',
   q: '',
   F: '',
   concreteGrade: 'custom',
@@ -167,9 +197,8 @@ export const defaultParams: Record<string, ParamValue> = {
 export const calcTargets: CalcTargetOption[] = [
   { value: 'all', label: '默认计算' },
   { value: 'worst', label: '最不利点判定' },
-  { value: 'rebar', label: '纵向受拉钢筋的截面面积计算' },
+  { value: 'rebar', label: '纵向受拉钢筋截面面积计算' },
   { value: 'shear', label: '斜截面受剪验算' },
 ];
 
 export const defaultCalcTarget = 'all';
-

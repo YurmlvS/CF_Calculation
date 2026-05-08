@@ -65,6 +65,8 @@ export interface StructuralBeamBiaxialResult {
     h: number;
     b: number;
     l: number;
+    a: number;
+    horizontalB: number;
     q: number;
     F: number;
     fc: number;
@@ -91,14 +93,16 @@ function hasNumber(params: Record<string, ParamValue>, key: string): boolean {
   return params[key] !== '' && Number.isFinite(Number(params[key]));
 }
 
-function normalizeSpan(l: number): { effectiveSpanM: number} {
+function normalizeSpan(l: number): { effectiveSpanM: number; scale: number } {
   if (l > 100) {
     return {
       effectiveSpanM: l / 100,
+      scale: 100,
     };
   }
   return {
     effectiveSpanM: l,
+    scale: 1,
   };
 }
 /*function normalizeSpan(l: number): { effectiveSpanM: number; spanNote: string } {
@@ -114,16 +118,24 @@ function normalizeSpan(l: number): { effectiveSpanM: number} {
   };
 }*/
 
-function calcWorstSection(l: number, q: number, F: number): WorstSectionResult {
-  const { effectiveSpanM} = normalizeSpan(l);
-  const a = effectiveSpanM / 2;
+function calcWorstSection(l: number, q: number, F: number, loadPositionA: number): WorstSectionResult {
+  const { effectiveSpanM, scale } = normalizeSpan(l);
+  const a = loadPositionA / scale;
   const spanB = effectiveSpanM - a;
   const verticalSupportMoment = -(q * effectiveSpanM ** 2) / 12;
   const verticalMidMoment = (q * effectiveSpanM ** 2) / 24;
   const verticalShear = (q * effectiveSpanM) / 2;
-  const horizontalSupportMoment = -(F * a * spanB ** 2) / effectiveSpanM ** 2;
+  const horizontalLeftSupportMoment = -(F * a * spanB ** 2) / effectiveSpanM ** 2;
+  const horizontalRightSupportMoment = (F * spanB * a ** 2) / effectiveSpanM ** 2;
+  const horizontalSupportMoment = Math.abs(horizontalLeftSupportMoment) >= Math.abs(horizontalRightSupportMoment)
+    ? horizontalLeftSupportMoment
+    : horizontalRightSupportMoment;
   const horizontalMidMoment = (F * a ** 2 * spanB ** 2) / effectiveSpanM ** 3;
-  const horizontalShear = (F * spanB ** 2 / effectiveSpanM ** 2) * (1 + (2 * a) / effectiveSpanM);
+  const horizontalLeftShear = (F * spanB ** 2 / effectiveSpanM ** 2) * (1 + (2 * a) / effectiveSpanM);
+  const horizontalRightShear = -(F * a ** 2 / effectiveSpanM ** 2) * (1 + (2 * spanB) / effectiveSpanM);
+  const horizontalShear = Math.abs(horizontalLeftShear) >= Math.abs(horizontalRightShear)
+    ? horizontalLeftShear
+    : horizontalRightShear;
   const Mx = Math.max(Math.abs(verticalSupportMoment), Math.abs(verticalMidMoment));
   const My = Math.max(Math.abs(horizontalSupportMoment), Math.abs(horizontalMidMoment));
   const V = Math.max(Math.abs(verticalShear), Math.abs(horizontalShear));
@@ -242,12 +254,13 @@ export function calculate(
   params: Record<string, ParamValue>,
   calcTarget: string,
 ): StructuralBeamBiaxialResult | null {
-  const required = ['h', 'b', 'l', 'q', 'F', 'fc', 'ft', 'fy', 'Aux', 'Auy'];
+  const required = ['h', 'b', 'l', 'a', 'q', 'F', 'fc', 'ft', 'fy', 'Aux', 'Auy'];
   if (!required.every((key) => hasNumber(params, key))) return null;
 
   const h = toNumber(params.h);
   const b = toNumber(params.b);
   const l = toNumber(params.l);
+  const a = toNumber(params.a);
   const q = toNumber(params.q);
   const F = toNumber(params.F);
   const fc = toNumber(params.fc);
@@ -256,10 +269,13 @@ export function calculate(
   const Aux = toNumber(params.Aux);
   const Auy = toNumber(params.Auy);
 
-  if ([h, b, l, q, F, fc, ft, fy, Aux, Auy].some((value) => value <= 0)) return null;
+  if ([h, b, l, a, q, F, fc, ft, fy, Aux, Auy].some((value) => value <= 0)) return null;
   if (h <= 40 || b <= 40) return null;
+  if (a >= l) return null;
 
-  const worst = calcWorstSection(l, q, F);
+  const { scale } = normalizeSpan(l);
+  const horizontalB = (l - a) / scale;
+  const worst = calcWorstSection(l, q, F, a);
   const xChoice = readRebarChoice(params, 'x');
   const yChoice = readRebarChoice(params, 'y');
   const x = calcFlexuralAxis('x', worst.Mx, b, h, fc, ft, fy, Aux, xChoice.count, xChoice.diameter);
@@ -269,7 +285,7 @@ export function calculate(
 
   return {
     mode: calcTarget,
-    input: { h, b, l, q, F, fc, ft, fy, Aux, Auy },
+    input: { h, b, l, a: a / scale, horizontalB, q, F, fc, ft, fy, Aux, Auy },
     worst,
     flexural: { x, y, isSafe: flexuralSafe },
     shear,

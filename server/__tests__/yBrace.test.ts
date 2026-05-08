@@ -199,6 +199,7 @@ test('calculates structural_beam_biaxial with normalized catalog selections', as
         h: 500,
         b: 250,
         l: 10,
+        a: 4,
         q: 20,
         F: 50,
         concreteGrade: 'C30',
@@ -219,6 +220,7 @@ test('calculates structural_beam_biaxial with normalized catalog selections', as
   assert.equal(body.normalizedParams.fc, 14.3);
   assert.equal(body.normalizedParams.ft, 1.43);
   assert.equal(body.normalizedParams.fy, 360);
+  assert.equal(body.normalizedParams.horizontalB, 6);
   assert.equal(body.normalizedParams.Aux, 1256);
   assert.equal(body.normalizedParams.Auy, 1017);
   assert.ok(body.result.worst);
@@ -235,12 +237,16 @@ test('schema exposes structural_beam_biaxial fields and targets', async () => {
 
   const body = await response.json() as any;
   const concreteField = body.paramFields.find((field: any) => field.key === 'concreteGrade');
+  const aField = body.paramFields.find((field: any) => field.key === 'a');
+  const horizontalBField = body.paramFields.find((field: any) => field.key === 'horizontalB');
   const targetValues = body.calcTargets.map((target: any) => target.value);
 
   assert.equal(response.status, 200);
   assert.equal(body.moduleId, 'structural_beam_biaxial');
   assert.equal(body.defaultCalcTarget, 'all');
   assert.equal(concreteField.inputType, 'select');
+  assert.ok(aField);
+  assert.ok(horizontalBField);
   assert.ok(concreteField.options.some((option: any) => option.value === 'C30'));
   assert.deepEqual(targetValues, ['all', 'worst', 'rebar', 'shear']);
 });
@@ -258,6 +264,7 @@ test('returns structural_beam_biaxial validation issues', async () => {
         h: 40,
         b: 250,
         l: 10,
+        a: 12,
         q: 20,
         F: 50,
         concreteGrade: 'C30',
@@ -276,6 +283,7 @@ test('returns structural_beam_biaxial validation issues', async () => {
   assert.equal(body.success, false);
   assert.equal(body.error.code, 'validation_failed');
   assert.ok(body.error.issues.some((issue: any) => issue.field === 'params.h'));
+  assert.ok(body.error.issues.some((issue: any) => issue.field === 'params.a'));
   assert.ok(body.error.issues.some((issue: any) => issue.field === 'params.steelGrade'));
   assert.ok(body.error.issues.some((issue: any) => issue.field === 'params.yRebarCount'));
 });

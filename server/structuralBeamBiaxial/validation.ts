@@ -13,6 +13,8 @@ export type StructuralBeamBiaxialParams = {
   h: number;
   b: number;
   l: number;
+  a: number;
+  horizontalB: number;
   q: number;
   F: number;
   concreteGrade: string;
@@ -197,6 +199,7 @@ export function validateStructuralBeamBiaxialRequest(body: unknown): ValidationR
     h: readPositiveNumber(params, 'h', issues),
     b: readPositiveNumber(params, 'b', issues),
     l: readPositiveNumber(params, 'l', issues),
+    a: readPositiveNumber(params, 'a', issues),
     q: readPositiveNumber(params, 'q', issues),
     F: readPositiveNumber(params, 'F', issues),
     concreteGrade,
@@ -228,6 +231,22 @@ export function validateStructuralBeamBiaxialRequest(body: unknown): ValidationR
     });
   }
 
+  if (
+    normalized.l !== ''
+    && normalized.a !== ''
+    && normalized.a >= normalized.l
+  ) {
+    issues.push({
+      field: 'params.a',
+      code: 'out_of_range',
+      message: 'a must be greater than 0 and less than l',
+    });
+  }
+
+  const horizontalB = normalized.l !== '' && normalized.a !== ''
+    ? Number((normalized.l - normalized.a).toFixed(6))
+    : '';
+
   if (issues.length > 0) {
     return { ok: false, issues };
   }
@@ -236,7 +255,7 @@ export function validateStructuralBeamBiaxialRequest(body: unknown): ValidationR
     ok: true,
     value: {
       calcTarget,
-      params: normalized as StructuralBeamBiaxialParams,
+      params: { ...normalized, horizontalB } as StructuralBeamBiaxialParams,
       rawParams: params,
     },
   };
