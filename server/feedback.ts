@@ -13,7 +13,7 @@ const feedbackSchema = z.object({
   type: z.enum(['module_request', 'calculation_error', 'feature_suggestion', 'other']),
   otherType: z.string().trim().max(100).optional(),
   content: z.string().trim().min(1, '反馈内容不能为空').max(3000, '反馈内容不能超过 3000 字'),
-  contact: z.string().trim().max(200, '联系方式不能超过 200 字').optional(),
+  contact: z.string().trim().min(1, '联系方式不能为空').max(200, '联系方式不能超过 200 字'),
   pageUrl: z.string().trim().max(1000).optional(),
 });
 
@@ -51,7 +51,7 @@ async function ensureFeedbackTable(): Promise<void> {
       type_label VARCHAR(100) NOT NULL,
       other_type VARCHAR(100),
       content TEXT NOT NULL,
-      contact VARCHAR(200),
+      contact VARCHAR(200) NOT NULL,
       page_url TEXT,
       user_agent TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -101,7 +101,7 @@ export async function saveFeedback(input: FeedbackInput, userAgent?: string) {
       typeLabel,
       input.otherType ?? null,
       input.content,
-      input.contact ?? null,
+      input.contact,
       input.pageUrl ?? null,
       userAgent ?? null,
     ],
@@ -155,7 +155,7 @@ export async function pushFeedbackToDingTalk(feedback: Awaited<ReturnType<typeof
     '### 新的用户反馈',
     `- 反馈类型：${typeText}`,
     `- 反馈内容：${sanitizeMarkdown(feedback.content)}`,
-    `- 联系方式：${feedback.contact ? sanitizeMarkdown(feedback.contact) : '未填写'}`,
+    `- 联系方式：${sanitizeMarkdown(feedback.contact)}`,
     `- 页面地址：${feedback.pageUrl ?? '未记录'}`,
     `- 提交时间：${feedback.createdAt.toISOString()}`,
   ].join('\n\n');

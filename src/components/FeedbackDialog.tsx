@@ -16,6 +16,14 @@ const feedbackOptions: Array<{ value: FeedbackType; label: string }> = [
 
 const API_BASE_URL = import.meta.env.VITE_FEEDBACK_API_BASE_URL ?? '';
 
+function RequiredLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span>
+      <span style={{ color: '#dc2626' }}>*</span> {children}
+    </span>
+  );
+}
+
 export default function FeedbackDialog({ open, onClose }: FeedbackDialogProps) {
   const [feedbackType, setFeedbackType] = useState<FeedbackType>('module_request');
   const [otherType, setOtherType] = useState('');
@@ -31,6 +39,7 @@ export default function FeedbackDialog({ open, onClose }: FeedbackDialogProps) {
   const canSubmit =
     status !== 'submitting' &&
     content.trim().length > 0 &&
+    contact.trim().length > 0 &&
     (feedbackType !== 'other' || otherType.trim().length > 0);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -52,7 +61,7 @@ export default function FeedbackDialog({ open, onClose }: FeedbackDialogProps) {
           type: feedbackType,
           otherType: feedbackType === 'other' ? otherType.trim() : undefined,
           content: content.trim(),
-          contact: contact.trim() || undefined,
+          contact: contact.trim(),
           pageUrl: window.location.href,
         }),
       });
@@ -129,7 +138,7 @@ export default function FeedbackDialog({ open, onClose }: FeedbackDialogProps) {
 
         <div style={{ display: 'grid', gap: '0.9rem', padding: '1.2rem' }}>
           <label style={{ display: 'grid', gap: '0.35rem', fontSize: '0.82rem', color: '#374151' }}>
-            反馈类型 <span style={{ color: '#dc2626' }}>*</span>
+            <RequiredLabel>反馈类型</RequiredLabel>
             <select
               value={feedbackType}
               onChange={(event) => setFeedbackType(event.target.value as FeedbackType)}
@@ -153,7 +162,7 @@ export default function FeedbackDialog({ open, onClose }: FeedbackDialogProps) {
 
           {feedbackType === 'other' && (
             <label style={{ display: 'grid', gap: '0.35rem', fontSize: '0.82rem', color: '#374151' }}>
-              其他类型说明 <span style={{ color: '#dc2626' }}>*</span>
+              <RequiredLabel>其他类型说明</RequiredLabel>
               <input
                 value={otherType}
                 onChange={(event) => setOtherType(event.target.value)}
@@ -170,7 +179,7 @@ export default function FeedbackDialog({ open, onClose }: FeedbackDialogProps) {
           )}
 
           <label style={{ display: 'grid', gap: '0.35rem', fontSize: '0.82rem', color: '#374151' }}>
-            反馈内容 <span style={{ color: '#dc2626' }}>*</span>
+            <RequiredLabel>反馈内容</RequiredLabel>
             <textarea
               value={content}
               onChange={(event) => setContent(event.target.value)}
@@ -190,11 +199,12 @@ export default function FeedbackDialog({ open, onClose }: FeedbackDialogProps) {
           </label>
 
           <label style={{ display: 'grid', gap: '0.35rem', fontSize: '0.82rem', color: '#374151' }}>
-            联系方式
+            <RequiredLabel>联系方式</RequiredLabel>
             <input
               value={contact}
               onChange={(event) => setContact(event.target.value)}
               maxLength={200}
+              required
               placeholder="邮箱/手机号/微信号等任何可以联系到您的方式"
               style={{
                 border: '1px solid #d1d5db',

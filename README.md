@@ -367,7 +367,7 @@ CREATE TABLE IF NOT EXISTS feedback (
   type_label VARCHAR(100) NOT NULL,
   other_type VARCHAR(100),
   content TEXT NOT NULL,
-  contact VARCHAR(200),
+  contact VARCHAR(200) NOT NULL,
   page_url TEXT,
   user_agent TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
