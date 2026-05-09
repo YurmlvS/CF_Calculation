@@ -3,6 +3,7 @@ import { modules, getModuleById, defaultModuleId } from './modules';
 import { ParamValue } from './modules/types';
 import Navbar from './components/Navbar';
 import ParamsPanel from './components/ParamsPanel';
+import FeedbackDialog from './components/FeedbackDialog';
 
 // 全局 Window 声明
 declare global {
@@ -13,6 +14,8 @@ declare global {
 }
 
 export default function App() {
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+
   // --- 当前模块 ID ---
   const [currentModuleId, setCurrentModuleId] = useState(defaultModuleId);
 
@@ -89,7 +92,8 @@ export default function App() {
       className="bg-gray-100 text-gray-800 font-sans h-full flex flex-col overflow-hidden"
     >
       {/* 顶部导航栏 */}
-      <Navbar />
+      <Navbar onFeedbackClick={() => setIsFeedbackOpen(true)} />
+      <FeedbackDialog open={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
 
       {/* 主体三列布局 */}
       <main className="flex flex-1 overflow-hidden relative">

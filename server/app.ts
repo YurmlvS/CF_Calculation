@@ -18,11 +18,12 @@ import {
 import { buildYBraceDocxBuffer } from './yBrace/docxReport';
 import { buildYBraceReport } from './yBrace/report';
 import { validateYBraceRequest } from './yBrace/validation';
+import { pushFeedbackToDingTalk, saveFeedback, validateFeedback } from './feedback';
 
 const DOCX_CONTENT_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
 function authMiddleware(req: Request, res: Response, next: NextFunction): void {
-  if (req.path === '/api/health') {
+  if (req.path === '/api/health' || req.path === '/api/feedback') {
     next();
     return;
   }
@@ -205,6 +206,35 @@ export function createApp() {
   app.post('/api/structural-beam-biaxial/calculate', (req, res) => {
     const response = handleStructuralBeamBiaxialCalculation(req.body);
     res.status(response.status).json(response.body);
+  });
+
+  app.post('/api/feedback', async (req, res, next) => {
+    try {
+      const validation = validateFeedback(req.body);
+      if (!validation.ok) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'validation_failed',
+            message: '反馈内容校验失败',
+            issues: validation.issues,
+          },
+        });
+        return;
+      }
+
+      const feedback = await saveFeedback(validation.value, req.header('user-agent'));
+      void pushFeedbackToDingTalk(feedback).catch((error) => {
+        console.error('Failed to push feedback to DingTalk:', error);
+      });
+
+      res.status(201).json({
+        success: true,
+        id: feedback.id,
+      });
+    } catch (error) {
+      next(error);
+    }
   });
 
   app.post('/api/y-brace/reports/docx', async (req, res, next) => {
