@@ -49,7 +49,7 @@ async function ensureFeedbackTable(): Promise<void> {
       "反馈类型" TEXT NOT NULL,
       "反馈内容" TEXT NOT NULL,
       "联系方式" TEXT NOT NULL,
-      "提交时间" TIME WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIME
+      "提交时间" TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai')
     );
   `);
   tableReady = true;
@@ -58,6 +58,17 @@ async function ensureFeedbackTable(): Promise<void> {
 function getTypeText(input: FeedbackInput): string {
   const typeLabel = feedbackTypeLabels[input.type];
   return input.type === 'other' && input.otherType ? `${typeLabel}（${input.otherType}）` : typeLabel;
+}
+
+function formatUtc8Timestamp(date: Date): string {
+  const utc8 = new Date(date.getTime() + 8 * 60 * 60 * 1000);
+  const pad = (value: number) => String(value).padStart(2, '0');
+
+  return [
+    utc8.getUTCFullYear(),
+    pad(utc8.getUTCMonth() + 1),
+    pad(utc8.getUTCDate()),
+  ].join('-') + ` ${pad(utc8.getUTCHours())}:${pad(utc8.getUTCMinutes())}:${pad(utc8.getUTCSeconds())}`;
 }
 
 export function validateFeedback(body: unknown) {
@@ -90,12 +101,14 @@ export async function saveFeedback(input: FeedbackInput) {
   await getPool().query(
     `INSERT INTO feedback
       ("反馈类型", "反馈内容", "联系方式", "提交时间")
-     VALUES ($1, $2, $3, CURRENT_TIME)`,
+     VALUES ($1, $2, $3, CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai')`,
     [typeText, input.content, input.contact],
   );
 
+  const submittedAt = new Date();
+
   return {
-    submittedAt: new Date(),
+    submittedAtText: formatUtc8Timestamp(submittedAt),
     typeText,
     ...input,
   };
@@ -135,7 +148,7 @@ export async function pushFeedbackToDingTalk(feedback: Awaited<ReturnType<typeof
     `- 反馈类型：${feedback.typeText}`,
     `- 反馈内容：${sanitizeMarkdown(feedback.content)}`,
     `- 联系方式：${sanitizeMarkdown(feedback.contact)}`,
-    `- 提交时间：${feedback.submittedAt.toISOString()}`,
+    `- 提交时间：${feedback.submittedAtText}`,
   ].join('\n\n');
 
   const response = await fetch(url, {
