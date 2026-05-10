@@ -352,7 +352,7 @@ npm run build
 ```text
 FEEDBACK_DATABASE_URL       必填，PostgreSQL 连接串，例如 postgresql://user:password@host:5432/tools-feedback
 FEEDBACK_DATABASE_SSL       可选，远程数据库要求 SSL 时设置为 true
-FEEDBACK_AUTO_INIT_TABLE    可选，设置为 true 时服务端会自动创建 feedback 表和 created_at 索引
+FEEDBACK_AUTO_INIT_TABLE    可选，设置为 true 时服务端会按下方 4 列结构自动创建 feedback 表
 DINGTALK_WEBHOOK_URL        可选，钉钉机器人 webhook 地址
 DINGTALK_SECRET             可选，钉钉机器人加签 secret
 VITE_FEEDBACK_API_BASE_URL  可选，前端和 API 分域部署时填写 API 基础地址；同源部署留空
@@ -362,18 +362,11 @@ VITE_FEEDBACK_API_BASE_URL  可选，前端和 API 分域部署时填写 API 基
 
 ```sql
 CREATE TABLE IF NOT EXISTS feedback (
-  id BIGSERIAL PRIMARY KEY,
-  type VARCHAR(50) NOT NULL,
-  type_label VARCHAR(100) NOT NULL,
-  other_type VARCHAR(100),
-  content TEXT NOT NULL,
-  contact VARCHAR(200) NOT NULL,
-  page_url TEXT,
-  user_agent TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  "反馈类型" TEXT NOT NULL,
+  "反馈内容" TEXT NOT NULL,
+  "联系方式" TEXT NOT NULL,
+  "提交时间" TIME WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIME
 );
-
-CREATE INDEX IF NOT EXISTS idx_feedback_created_at ON feedback (created_at DESC);
 ```
 
 还需要在 PostgreSQL 上创建应用专用账号，并授予 `feedback` 表的 `INSERT` 权限；如果开启 `FEEDBACK_AUTO_INIT_TABLE=true`，该账号还需要 `CREATE` 权限。钉钉机器人使用“加签”安全设置时，将 secret 填入 `DINGTALK_SECRET` 即可，服务端会自动追加 `timestamp` 和 `sign`。

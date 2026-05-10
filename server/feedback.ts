@@ -46,19 +46,18 @@ async function ensureFeedbackTable(): Promise<void> {
 
   await getPool().query(`
     CREATE TABLE IF NOT EXISTS feedback (
-      id BIGSERIAL PRIMARY KEY,
-      type VARCHAR(50) NOT NULL,
-      type_label VARCHAR(100) NOT NULL,
-      other_type VARCHAR(100),
-      content TEXT NOT NULL,
-      contact VARCHAR(200) NOT NULL,
-      page_url TEXT,
-      user_agent TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      "反馈类型" TEXT NOT NULL,
+      "反馈内容" TEXT NOT NULL,
+      "联系方式" TEXT NOT NULL,
+      "提交时间" TIME WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIME
     );
-    CREATE INDEX IF NOT EXISTS idx_feedback_created_at ON feedback (created_at DESC);
   `);
   tableReady = true;
+}
+
+function getTypeText(input: FeedbackInput): string {
+  const typeLabel = feedbackTypeLabels[input.type];
+  return input.type === 'other' && input.otherType ? `${typeLabel}（${input.otherType}）` : typeLabel;
 }
 
 export function validateFeedback(body: unknown) {
@@ -84,34 +83,20 @@ export function validateFeedback(body: unknown) {
   return { ok: true as const, value: parsed.data };
 }
 
-export async function saveFeedback(input: FeedbackInput, userAgent?: string) {
+export async function saveFeedback(input: FeedbackInput) {
   await ensureFeedbackTable();
 
-  const typeLabel = feedbackTypeLabels[input.type];
-  const result = await getPool().query<{
-    id: number;
-    created_at: Date;
-  }>(
+  const typeText = getTypeText(input);
+  await getPool().query(
     `INSERT INTO feedback
-      (type, type_label, other_type, content, contact, page_url, user_agent)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     RETURNING id, created_at`,
-    [
-      input.type,
-      typeLabel,
-      input.otherType ?? null,
-      input.content,
-      input.contact,
-      input.pageUrl ?? null,
-      userAgent ?? null,
-    ],
+      ("反馈类型", "反馈内容", "联系方式", "提交时间")
+     VALUES ($1, $2, $3, CURRENT_TIME)`,
+    [typeText, input.content, input.contact],
   );
 
-  const row = result.rows[0];
   return {
-    id: row.id,
-    createdAt: row.created_at,
-    typeLabel,
+    submittedAt: new Date(),
+    typeText,
     ...input,
   };
 }
@@ -146,18 +131,11 @@ export async function pushFeedbackToDingTalk(feedback: Awaited<ReturnType<typeof
     return;
   }
 
-  const typeText =
-    feedback.type === 'other' && feedback.otherType
-      ? `${feedback.typeLabel}（${feedback.otherType}）`
-      : feedback.typeLabel;
-
   const markdown = [
-    '### 新的用户反馈',
-    `- 反馈类型：${typeText}`,
+    `- 反馈类型：${feedback.typeText}`,
     `- 反馈内容：${sanitizeMarkdown(feedback.content)}`,
     `- 联系方式：${sanitizeMarkdown(feedback.contact)}`,
-    `- 页面地址：${feedback.pageUrl ?? '未记录'}`,
-    `- 提交时间：${feedback.createdAt.toISOString()}`,
+    `- 提交时间：${feedback.submittedAt.toISOString()}`,
   ].join('\n\n');
 
   const response = await fetch(url, {

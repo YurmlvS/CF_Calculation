@@ -223,14 +223,13 @@ export function createApp() {
         return;
       }
 
-      const feedback = await saveFeedback(validation.value, req.header('user-agent'));
+      const feedback = await saveFeedback(validation.value);
       void pushFeedbackToDingTalk(feedback).catch((error) => {
         console.error('Failed to push feedback to DingTalk:', error);
       });
 
       res.status(201).json({
         success: true,
-        id: feedback.id,
       });
     } catch (error) {
       next(error);
