@@ -3,6 +3,8 @@
  */
 import { ParamFieldDef, CalcTargetOption } from '../types';
 import { braceMaterialSpecs } from './materials';
+import rValueTipImage from './tips_images/R_value.png';
+import muValueTipImage from './tips_images/mu_value.png';
 
 const materialOptions = [
   ...braceMaterialSpecs.map((item) => ({
@@ -16,8 +18,26 @@ const materialOptions = [
 export const paramFields: ParamFieldDef[] = [
   { key: 'n', label: '支撑件上下固定点的垂直距离 n (mm)', placeholder: '例如: 4800' },
   { key: 'm', label: '支撑件上下固定点的水平距离 m (mm)', placeholder: '例如: 2144' },
-  { key: 'mu', label: 'μ 计算长度系数', placeholder: '例如: 1' },
-  { key: 'R', label: 'R 下撑杆件支座力 (kN)', placeholder: '例如: 25.151' },
+  {
+    key: 'mu',
+    label: 'μ 计算长度系数数值',
+    placeholder: '例如: 1',
+    tip: {
+      imageSrc: muValueTipImage,
+      imageAlt: 'μ 值取值方式',
+      caption: 'μ 值取值方式',
+    },
+  },
+  {
+    key: 'R',
+    label: 'R 下撑杆件支座力 (kN)',
+    placeholder: '例如: 25.151',
+    tip: {
+      imageSrc: rValueTipImage,
+      imageAlt: '下撑杆件支座力取值方式',
+      caption: '主梁示意图\n提取自品茗型钢悬挑脚手架计算模块，主梁支座反力 R3',
+    },
+  },
   {
     key: 'materialSpec',
     label: '型材截面选择',

@@ -21,10 +21,17 @@ export interface ParamOption {
   fill?: Record<string, ParamValue>;
 }
 
+export interface ParamFieldTip {
+  imageSrc: string;
+  caption: string;
+  imageAlt?: string;
+}
+
 export interface ParamFieldDef {
   key: string;
   label: string;
   placeholder: string;
+  tip?: ParamFieldTip;
   inputType?: 'number' | 'select';
   options?: ParamOption[];
   inlineWithNext?: {

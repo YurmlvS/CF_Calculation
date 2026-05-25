@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { CalcModule, ParamFieldDef, ParamValue } from '../modules/types';
 import { modules } from '../modules';
 
@@ -13,28 +14,41 @@ interface ParamsPanelProps {
   onCalcTargetChange: (value: string) => void;
 }
 
+const fieldLabelStyle: React.CSSProperties = {
+  display: 'block',
+  marginBottom: '0.25rem',
+  fontSize: '0.75rem',
+  fontWeight: 500,
+  color: '#374151',
+};
+
+const fieldLabelRowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.25rem',
+  marginBottom: '0.25rem',
+};
+
 /** 单个输入行（标签 + 输入框，竖向单列） */
 const Field: React.FC<{
   id: string;
   label: React.ReactNode;
+  tip?: ParamFieldDef['tip'];
   placeholder: string;
   value: ParamValue;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   disabled?: boolean;
-}> = ({ id, label, placeholder, value, onChange, disabled }) => (
+}> = ({ id, label, tip, placeholder, value, onChange, disabled }) => (
   <div style={{ marginBottom: '0.625rem' }}>
-    <label
-      htmlFor={id}
-      style={{
-        display: 'block',
-        marginBottom: '0.25rem',
-        fontSize: '0.75rem',
-        fontWeight: 500,
-        color: '#374151',
-      }}
-    >
-      {label}
-    </label>
+    <div style={fieldLabelRowStyle}>
+      <label
+        htmlFor={id}
+        style={{ ...fieldLabelStyle, marginBottom: 0 }}
+      >
+        {label}
+      </label>
+      {tip && <ParamTip tip={tip} />}
+    </div>
     <input
       id={id}
       type="number"
@@ -67,6 +81,108 @@ const Field: React.FC<{
     />
   </div>
 );
+
+const ParamTip: React.FC<{ tip: NonNullable<ParamFieldDef['tip']> }> = ({ tip }) => {
+  const triggerRef = React.useRef<HTMLSpanElement>(null);
+  const tipId = React.useRef(`param-tip-${Math.random().toString(36).slice(2)}`);
+  const [isVisible, setIsVisible] = React.useState(false);
+  const [position, setPosition] = React.useState({ left: 0, top: 0 });
+
+  const updatePosition = React.useCallback(() => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    setPosition({
+      left: rect.left + rect.width / 2,
+      top: rect.top - 8,
+    });
+  }, []);
+
+  const showTip = React.useCallback(() => {
+    updatePosition();
+    window.dispatchEvent(new CustomEvent('param-tip-show', { detail: tipId.current }));
+    setIsVisible(true);
+  }, [updatePosition]);
+
+  const hideTip = React.useCallback(() => {
+    setIsVisible(false);
+  }, []);
+
+  React.useEffect(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return undefined;
+
+    trigger.addEventListener('pointerenter', showTip);
+    trigger.addEventListener('mouseenter', showTip);
+    trigger.addEventListener('click', showTip);
+    trigger.addEventListener('pointerleave', hideTip);
+    trigger.addEventListener('mouseleave', hideTip);
+    trigger.addEventListener('focus', showTip);
+    trigger.addEventListener('blur', hideTip);
+
+    return () => {
+      trigger.removeEventListener('pointerenter', showTip);
+      trigger.removeEventListener('mouseenter', showTip);
+      trigger.removeEventListener('click', showTip);
+      trigger.removeEventListener('pointerleave', hideTip);
+      trigger.removeEventListener('mouseleave', hideTip);
+      trigger.removeEventListener('focus', showTip);
+      trigger.removeEventListener('blur', hideTip);
+    };
+  }, [hideTip, showTip]);
+
+  React.useEffect(() => {
+    const handleOtherTipShow = (event: Event) => {
+      if ((event as CustomEvent<string>).detail !== tipId.current) {
+        setIsVisible(false);
+      }
+    };
+
+    window.addEventListener('param-tip-show', handleOtherTipShow);
+    return () => {
+      window.removeEventListener('param-tip-show', handleOtherTipShow);
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (!isVisible) return undefined;
+
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [isVisible, updatePosition]);
+
+  return (
+    <>
+      <span
+        ref={triggerRef}
+        className="param-tip-trigger"
+        tabIndex={0}
+        aria-label={tip.caption}
+      >
+        <span className="param-tip-icon" aria-hidden="true">?</span>
+      </span>
+      {isVisible && createPortal(
+        <span
+          className="param-tip-popover"
+          role="tooltip"
+          style={{
+            left: position.left,
+            top: position.top,
+          }}
+        >
+          <img className="param-tip-image" src={tip.imageSrc} alt={tip.imageAlt ?? tip.caption} />
+          <span className="param-tip-caption">{tip.caption}</span>
+        </span>,
+        document.body,
+      )}
+    </>
+  );
+};
 
 const renderRichLabel = (label: string): React.ReactNode => {
   const parts: React.ReactNode[] = [];
@@ -180,18 +296,15 @@ const ParamsPanel: React.FC<ParamsPanelProps> = ({
     if (field.inputType === 'select') {
       return (
         <div key={field.key} style={{ marginBottom: '0.625rem' }}>
-          <label
-            htmlFor={`input-${field.key}`}
-            style={{
-              display: 'block',
-              marginBottom: '0.25rem',
-              fontSize: '0.75rem',
-              fontWeight: 500,
-              color: '#374151',
-            }}
-          >
-            {renderRichLabel(field.label)}
-          </label>
+          <div style={fieldLabelRowStyle}>
+            <label
+              htmlFor={`input-${field.key}`}
+              style={{ ...fieldLabelStyle, marginBottom: 0 }}
+            >
+              {renderRichLabel(field.label)}
+            </label>
+            {field.tip && <ParamTip tip={field.tip} />}
+          </div>
           {renderSelectControl(field)}
         </div>
       );
@@ -202,6 +315,7 @@ const ParamsPanel: React.FC<ParamsPanelProps> = ({
         key={field.key}
         id={`input-${field.key}`}
         label={renderRichLabel(field.label)}
+        tip={field.tip}
         placeholder={field.placeholder}
         value={params[field.key] ?? ''}
         onChange={onParamChange(field.key)}
@@ -222,13 +336,7 @@ const ParamsPanel: React.FC<ParamsPanelProps> = ({
           <div key={`${field.key}-${nextField.key}`} style={{ marginBottom: '0.625rem' }}>
             <label
               htmlFor={`input-${field.key}`}
-              style={{
-                display: 'block',
-                marginBottom: '0.25rem',
-                fontSize: '0.75rem',
-                fontWeight: 500,
-                color: '#374151',
-              }}
+              style={fieldLabelStyle}
             >
               {renderRichLabel(field.label)}
             </label>

@@ -575,6 +575,83 @@ select {
   outline: none;
 }
 
+.param-tip-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  outline: none;
+}
+
+.param-tip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.875rem;
+  height: 0.875rem;
+  border: 1px solid #93c5fd;
+  border-radius: 999px;
+  background-color: #eff6ff;
+  color: #2563eb;
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.param-tip-popover {
+  position: fixed;
+  z-index: 9999;
+  display: block;
+  width: max-content;
+  max-width: min(28rem, calc(100vw - 2rem));
+  padding: 0.5rem;
+  border: 1px solid #dbeafe;
+  border-radius: 0.5rem;
+  background-color: #ffffff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+  pointer-events: none;
+  transform: translate(-50%, -100%);
+}
+
+.param-tip-popover::after {
+  position: absolute;
+  left: 50%;
+  bottom: -0.32rem;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-right: 1px solid #dbeafe;
+  border-bottom: 1px solid #dbeafe;
+  background-color: #ffffff;
+  content: '';
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.param-tip-trigger:focus .param-tip-icon {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.param-tip-image {
+  display: block;
+  width: auto;
+  max-width: 25rem;
+  max-height: 14rem;
+  border-radius: 0.25rem;
+  object-fit: contain;
+}
+
+.param-tip-caption {
+  display: block;
+  max-width: 25rem;
+  margin-top: 0.35rem;
+  color: #1f2937;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  white-space: pre-line;
+}
+
 input[type='number']:focus,
 select:focus {
   border-color: #3b82f6;
